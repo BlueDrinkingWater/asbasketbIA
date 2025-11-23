@@ -1,6 +1,7 @@
+// client/src/pages/Players.jsx
 import React, { useEffect, useState } from 'react';
 import { fetchPlayers } from '../services/api';
-import { Search, Filter, Trophy, X, User } from 'lucide-react';
+import { Search, Filter, X, User } from 'lucide-react';
 
 const Players = () => {
   const [players, setPlayers] = useState([]);
@@ -8,17 +9,23 @@ const Players = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   
-  // Modal State
   const [selectedPlayer, setSelectedPlayer] = useState(null);
-  // Sort State
-  const [sortBy, setSortBy] = useState('ppg'); // Default sort by Points
+  const [sortBy, setSortBy] = useState('ppg');
+
+  // SAFE IMAGE LOADER
+  const getPlayerImage = (player) => {
+    if (player.imageUrl && !player.imageUrl.includes('placeholder')) {
+      return player.imageUrl;
+    }
+    // Generates an avatar with the player's initials
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=random&color=fff&size=200`;
+  };
 
   useEffect(() => {
     const getPlayers = async () => {
       try {
         const { data } = await fetchPlayers();
         if (data.success) {
-          // Calculate Fantasy Points for sorting/display locally
           const enrichedData = data.data.map(p => ({
             ...p,
             fantasyPoints: (
@@ -48,7 +55,6 @@ const Players = () => {
       player.team.toLowerCase().includes(search.toLowerCase())
     );
 
-    // Sorting Logic
     result.sort((a, b) => {
         const valA = parseFloat(a[sortBy]) || 0;
         const valB = parseFloat(b[sortBy]) || 0;
@@ -58,7 +64,6 @@ const Players = () => {
     setFilteredPlayers(result);
   }, [search, players, sortBy]);
 
-  // Helper to get rank index in the global list
   const getGlobalRank = (player) => {
     const sortedAll = [...players].sort((a,b) => (parseFloat(b[sortBy]) || 0) - (parseFloat(a[sortBy]) || 0));
     return sortedAll.findIndex(p => p._id === player._id) + 1;
@@ -73,7 +78,6 @@ const Players = () => {
         </div>
         
         <div className="mt-4 md:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-          {/* Sort Dropdown */}
           <div className="relative">
              <select 
                value={sortBy} 
@@ -118,24 +122,22 @@ const Players = () => {
               onClick={() => setSelectedPlayer(player)}
               className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative group"
             >
-               {/* Rank Badge */}
                <div className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full z-10 shadow-md">
                  #{getGlobalRank(player)} in {sortBy === 'fantasyPoints' ? 'FP' : sortBy.toUpperCase().replace('MADE', '')}
                </div>
 
               <div className="aspect-w-16 aspect-h-12 bg-gray-50 relative overflow-hidden">
-                 {player.imageUrl && !player.imageUrl.includes('placeholder') ? (
-                    <img
-                    src={player.imageUrl}
+                 <img
+                    src={getPlayerImage(player)}
                     alt={player.name}
                     className="w-full h-56 object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/300x300?text=No+Image"; }}
-                    />
-                 ) : (
-                    <div className="w-full h-56 flex items-center justify-center bg-indigo-50 text-indigo-200">
-                        <User className="h-24 w-24" />
-                    </div>
-                 )}
+                    // Prevent infinite loop if UI Avatars also fails
+                    onError={(e) => { 
+                      e.target.onerror = null; 
+                      e.target.style.display = 'none';
+                      e.target.parentNode.style.backgroundColor = '#eee';
+                    }}
+                 />
                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
                  <div className="absolute bottom-3 left-3 text-white">
                     <h3 className="text-lg font-bold leading-tight">{player.name}</h3>
@@ -171,28 +173,20 @@ const Players = () => {
         </div>
       )}
 
-      {/* Player Details Modal */}
       {selectedPlayer && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            
-            {/* Background Overlay */}
             <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setSelectedPlayer(null)}></div>
-
-            {/* Center Modal */}
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
             <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full border border-gray-200">
-              
               <div className="relative h-32 bg-gradient-to-r from-indigo-900 to-blue-800">
                  <button onClick={() => setSelectedPlayer(null)} className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/20 rounded-full p-1 hover:bg-black/40 transition">
                     <X className="h-6 w-6" />
                  </button>
                  <div className="absolute -bottom-12 left-6 p-1 bg-white rounded-full">
                     <div className="h-24 w-24 bg-gray-200 rounded-full overflow-hidden flex items-center justify-center border-4 border-white shadow-lg">
-                        {selectedPlayer.imageUrl ? (
-                            <img src={selectedPlayer.imageUrl} className="h-full w-full object-cover" alt="" />
-                        ) : <User className="h-12 w-12 text-gray-400" />}
+                        <img src={getPlayerImage(selectedPlayer)} className="h-full w-full object-cover" alt="" />
                     </div>
                  </div>
               </div>
@@ -211,7 +205,6 @@ const Players = () => {
 
                  <div className="mt-8">
                     <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4 border-b pb-2">Season Statistics</h4>
-                    
                     <div className="grid grid-cols-3 gap-3 mb-3">
                        <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
                           <span className="block text-2xl font-black text-gray-900">{selectedPlayer.ppg}</span>
@@ -226,50 +219,10 @@ const Players = () => {
                           <span className="text-xs text-gray-500 font-semibold uppercase">AST</span>
                        </div>
                     </div>
-
-                    <div className="grid grid-cols-4 gap-2 mb-3">
-                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
-                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.spg}</span>
-                          <span className="text-[10px] text-gray-500 font-semibold uppercase">STL</span>
-                       </div>
-                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
-                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.bpg}</span>
-                          <span className="text-[10px] text-gray-500 font-semibold uppercase">BLK</span>
-                       </div>
-                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
-                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.turnovers || 0}</span>
-                          <span className="text-[10px] text-gray-500 font-semibold uppercase">TO</span>
-                       </div>
-                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
-                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.gamesPlayed}</span>
-                          <span className="text-[10px] text-gray-500 font-semibold uppercase">GP</span>
-                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                       <div className="bg-indigo-50 p-2 rounded-lg text-center border border-indigo-100">
-                          <span className="block text-lg font-bold text-indigo-900">{selectedPlayer.threeMade || 0}</span>
-                          <span className="text-[10px] text-indigo-600 font-semibold uppercase">3PM</span>
-                       </div>
-                       <div className="bg-indigo-50 p-2 rounded-lg text-center border border-indigo-100">
-                          <span className="block text-lg font-bold text-indigo-900">{selectedPlayer.ftMade || 0}</span>
-                          <span className="text-[10px] text-indigo-600 font-semibold uppercase">FTM</span>
-                       </div>
-                       <div className="bg-green-50 p-2 rounded-lg text-center border border-green-100">
-                          <span className="block text-lg font-bold text-green-700">{selectedPlayer.fantasyPoints}</span>
-                          <span className="text-[10px] text-green-600 font-semibold uppercase">FP</span>
-                       </div>
-                    </div>
-
                  </div>
               </div>
-
               <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
-                <button 
-                  type="button" 
-                  className="inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
-                  onClick={() => setSelectedPlayer(null)}
-                >
+                <button type="button" className="inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setSelectedPlayer(null)}>
                   Close
                 </button>
               </div>
