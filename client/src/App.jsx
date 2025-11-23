@@ -6,8 +6,9 @@ import Players from './pages/Players';
 import Standings from './pages/Standings';
 import Subscribe from './pages/Subscribe';
 import AdminDashboard from './pages/AdminDashboard';
+import SubscriberDashboard from './pages/SubscriberDashboard'; // Import New Page
 import Schedule from './pages/Schedule'; 
-import Login from './pages/Login'; // Matches the file created in step 1
+import Login from './pages/Login';
 
 // Helper for protected routes
 const ProtectedRoute = ({ children, role }) => {
@@ -32,10 +33,17 @@ function App() {
         <Route path="/subscribe" element={<Subscribe />} />
         <Route path="/login" element={<Login />} />
 
-        {/* Protected Admin Routes */}
+        {/* Protected Routes */}
         <Route path="/admin" element={
           <ProtectedRoute role="admin">
             <AdminDashboard />
+          </ProtectedRoute>
+        } />
+
+        {/* New Subscriber Dashboard Route */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute role="user">
+            <SubscriberDashboard />
           </ProtectedRoute>
         } />
       </Routes>

@@ -8,28 +8,40 @@ API.interceptors.request.use((req) => {
   return req;
 });
 
-// Auth
+// --- Auth & User ---
 export const registerUser = (data) => API.post('/auth/register', data);
 export const loginUser = (data) => API.post('/auth/login', data);
-export const fetchUsers = () => API.get('/auth/users');
-export const updateUserStatus = (userId, status) => API.put('/auth/status', { userId, status });
 
-// Teams & Standings
+// --- Subscriber Actions ---
+export const submitTeam = (data) => API.post('/auth/submit-team', data);
+export const submitStats = (data) => API.post('/auth/submit-stats', data);
+export const registerForGame = (data) => API.post('/auth/submit-game', data);
+
+// --- Admin Dashboard Actions ---
+export const fetchAdminData = () => API.get('/auth/admin-data');
+export const updateSubscription = (data) => API.put('/auth/admin/subscription', data);
+export const updateTeamRequest = (data) => API.put('/auth/admin/team-request', data);
+export const updateStatRequest = (data) => API.put('/auth/admin/stat-request', data);
+export const updateGameRequest = (data) => API.put('/auth/admin/game-request', data);
+
+// --- Public Data & Management ---
+
+// Teams
 export const fetchTeams = () => API.get('/teams');
-// Added alias for clarity in Standings page
 export const fetchStandings = () => API.get('/teams'); 
 export const createTeam = (data) => API.post('/teams', data);
 
 // Players
-// Updated to accept query params (limit, page, sort)
 export const fetchPlayers = (params) => API.get('/players', { params });
+// Supports file upload (multipart/form-data)
 export const createPlayer = (data) => API.post('/players', data, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });
+// Admin update player stats directly (if supported by backend, otherwise creates new)
+export const updatePlayer = (id, data) => API.put(`/players/${id}`, data); 
 
 // Games
 export const fetchGames = () => API.get('/games');
 export const createGame = (data) => API.post('/games', data);
-export const updateGameStats = (gameId, data) => API.put(`/games/${gameId}/stats`, data);
 
 export default API;

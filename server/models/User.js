@@ -8,19 +8,19 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   contactNumber: { type: String },
   
-  // Subscription / Application Status
+  // Subscription Status
   subscriptionStatus: { 
     type: String, 
     enum: ['pending', 'active', 'rejected', 'inactive'], 
     default: 'inactive' 
   },
   subscriptionExpiresAt: { type: Date },
-  
-  paymentProofUrl: { type: String }, // URL from Cloudinary
+  paymentProofUrl: { type: String },
 
-  // Pending Team Application Data (Stores data here until Admin approves)
+  // 1. Team Registration (Pending Admin Approval)
   teamRegistration: {
     isApplicant: { type: Boolean, default: false },
+    status: { type: String, enum: ['pending', 'approved', 'rejected', 'none'], default: 'none' },
     teamName: { type: String },
     conference: { type: String, enum: ['East', 'West'] },
     roster: [{
@@ -29,7 +29,36 @@ const userSchema = new mongoose.Schema({
       jerseyNumber: String,
       position: String
     }]
-  }
+  },
+
+  // 2. Player Stat Requests (Pending Admin Approval)
+  statRequests: [{
+    playerName: { type: String, required: true },
+    gameDate: { type: Date },
+    stats: {
+      ppg: Number,
+      rpg: Number,
+      apg: Number,
+      spg: Number,
+      bpg: Number
+    },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    dateSubmitted: { type: Date, default: Date.now }
+  }],
+
+  // 3. Game Registration Requests (Pending Admin Approval)
+  gameRequests: [{
+    gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+    teamName: { type: String }, // The team they are registering for this game
+    roster: [{
+      name: String,
+      jerseyNumber: String,
+      position: String
+    }],
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    dateSubmitted: { type: Date, default: Date.now }
+  }]
+
 }, { timestamps: true });
 
 // Hash password before saving

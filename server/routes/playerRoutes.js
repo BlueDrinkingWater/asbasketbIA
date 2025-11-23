@@ -1,11 +1,20 @@
 import express from 'express';
-import { createPlayer, getPlayers } from '../controllers/playerController.js';
+import { getPlayers, createPlayer, getPlayerById, updatePlayer } from '../controllers/playerController.js';
+import { upload } from '../config/cloudinary.js'; // Middleware for image upload
 import { protect, admin } from '../middleware/auth.js';
-import { upload } from '../config/cloudinary.js'; // Reusing your existing upload config
 
 const router = express.Router();
 
+// Public: Get all players
 router.get('/', getPlayers);
-router.post('/', protect, admin, upload.single('photo'), createPlayer);
+
+// Public: Get single player
+router.get('/:id', getPlayerById);
+
+// Admin: Create a player (Requires Image Upload)
+router.post('/', protect, admin, upload.single('image'), createPlayer);
+
+// Admin: Update player
+router.put('/:id', protect, admin, updatePlayer);
 
 export default router;

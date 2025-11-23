@@ -1,77 +1,62 @@
 import Player from '../models/Player.js';
 
+// Get all players
 export const getPlayers = async (req, res, next) => {
   try {
-    const { search, position, team, page = 1, limit = 12 } = req.query;
-    const query = {};
-
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { team: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (position) query.position = position;
-    if (team) query.team = { $regex: team, $options: 'i' };
-
-    // Sort by PPG descending to show best players first
-    const players = await Player.find(query)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ ppg: -1 });
-
-    const total = await Player.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: players,
-      pagination: {
-        total,
-        page: parseInt(page),
-        pages: Math.ceil(total / limit)
-      }
-    });
+    const players = await Player.find().sort({ ppg: -1 }); // Default sort by points
+    res.json({ success: true, data: players });
   } catch (error) {
     next(error);
   }
 };
 
-export const createPlayer = async (req, res, next) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please upload a player photo' });
-    }
-
-    // FIX: Use Cloudinary's secure_url from req.file.path
-    // The previous code tried to build a local URL which won't work with Cloudinary
-    const player = await Player.create({
-      ...req.body,
-      imageUrl: req.file.path 
-    });
-
-    // --- Socket.io Emit ---
-    // Update the public leaderboard immediately
-    const io = req.app.get('io');
-    io.emit('players_updated', { message: 'New player stats added' });
-    // ----------------------
-
-    res.status(201).json({
-      success: true,
-      data: player
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
+// Get single player
 export const getPlayerById = async (req, res, next) => {
   try {
     const player = await Player.findById(req.params.id);
-    if (!player) {
-      res.status(404);
-      throw new Error('Player not found');
+    if (!player) return res.status(404).json({ success: false, message: 'Player not found' });
+    res.json({ success: true, data: player });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Create Player (Admin Only)
+export const createPlayer = async (req, res, next) => {
+  try {
+    const { name, team, position, jerseyNumber, ppg, rpg, apg } = req.body;
+
+    // Check if image was uploaded
+    let imageUrl = '';
+    if (req.file && req.file.path) {
+      imageUrl = req.file.path;
+    } else {
+      // Fallback placeholder if no image provided
+      imageUrl = `https://ui-avatars.com/api/?name=${name}&background=random`;
     }
-    res.status(200).json({ success: true, data: player });
+
+    const newPlayer = await Player.create({
+      name,
+      team,
+      position,
+      jerseyNumber,
+      ppg: ppg || 0,
+      rpg: rpg || 0,
+      apg: apg || 0,
+      imageUrl
+    });
+
+    res.status(201).json({ success: true, data: newPlayer });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update Player
+export const updatePlayer = async (req, res, next) => {
+  try {
+    const updatedPlayer = await Player.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ success: true, data: updatedPlayer });
   } catch (error) {
     next(error);
   }

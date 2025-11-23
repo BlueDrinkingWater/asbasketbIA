@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Calendar, User, LogOut, Shield } from 'lucide-react';
+import { Trophy, Shield, LogOut, LayoutDashboard } from 'lucide-react'; // Added LayoutDashboard icon
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -25,22 +25,26 @@ const Navbar = () => {
             <Link to="/players" className="hover:text-yellow-400 transition">Players</Link>
             <Link to="/standings" className="hover:text-yellow-400 transition">Standings</Link>
             <Link to="/schedule" className="hover:text-yellow-400 transition">Schedule</Link>
-            
-            {user?.subscriptionStatus === 'active' && (
-               <Link to="/pro-stats" className="text-yellow-400 font-semibold">Pro Board</Link>
-            )}
           </div>
 
           <div className="flex items-center space-x-4">
             {user ? (
               <div className="flex items-center space-x-4">
-                {user.role === 'admin' && (
-                  <Link to="/admin" className="flex items-center text-sm bg-red-600 px-3 py-1 rounded hover:bg-red-700">
+                
+                {/* Admin Link */}
+                {user.role === 'admin' ? (
+                  <Link to="/admin" className="flex items-center text-sm bg-red-600 px-3 py-1 rounded hover:bg-red-700 transition">
                     <Shield className="w-4 h-4 mr-1" /> Admin
                   </Link>
+                ) : (
+                  /* Subscriber Dashboard Link */
+                  <Link to="/dashboard" className="flex items-center text-sm bg-orange-600 px-3 py-1 rounded hover:bg-orange-700 transition">
+                    <LayoutDashboard className="w-4 h-4 mr-1" /> Dashboard
+                  </Link>
                 )}
-                <span className="text-sm text-gray-300">Hi, {user.name}</span>
-                <button onClick={handleLogout} className="p-2 hover:bg-indigo-800 rounded-full">
+
+                <span className="text-sm text-gray-300 hidden sm:block">Hi, {user.name}</span>
+                <button onClick={handleLogout} className="p-2 hover:bg-indigo-800 rounded-full transition">
                   <LogOut className="w-5 h-5" />
                 </button>
               </div>

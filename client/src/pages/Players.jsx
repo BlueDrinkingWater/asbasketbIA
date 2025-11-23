@@ -1,137 +1,243 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
-// FIX: Explicitly add .jsx extension to ensure resolution
-import { useApi } from '../hooks/useApi.jsx'; 
+import React, { useEffect, useState } from 'react';
 import { fetchPlayers } from '../services/api';
-import io from 'socket.io-client';
+import { Search, Filter, Trophy, X, User } from 'lucide-react';
 
 const Players = () => {
-  const [filters, setFilters] = useState({ search: '', position: '', team: '' });
-  const [page, setPage] = useState(1);
+  const [players, setPlayers] = useState([]);
+  const [filteredPlayers, setFilteredPlayers] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
   
-  const queryParams = { ...filters, page, limit: 12 };
-  // Ensure fetchPlayers is defined in services/api.js
-  const { data: response, loading, error, refetch } = useApi(() => fetchPlayers(queryParams), [page, JSON.stringify(filters)]);
-  
-  const players = response?.data || [];
-  const pagination = response?.pagination || { pages: 1 };
+  // Modal State
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  // Sort State
+  const [sortBy, setSortBy] = useState('ppg'); // Default sort by Points
 
-  // Socket.io for real-time updates
   useEffect(() => {
-    const socket = io('http://localhost:5000');
-    socket.on('players_updated', () => {
-      refetch();
-    });
-    return () => socket.disconnect();
-  }, [refetch]);
+    const getPlayers = async () => {
+      try {
+        const { data } = await fetchPlayers();
+        if (data.success) {
+          setPlayers(data.data);
+          setFilteredPlayers(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching players:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    getPlayers();
+  }, []);
 
-  const handleFilter = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setPage(1);
+  useEffect(() => {
+    let result = players.filter(player =>
+      player.name.toLowerCase().includes(search.toLowerCase()) ||
+      player.team.toLowerCase().includes(search.toLowerCase())
+    );
+
+    // Sorting Logic to Determine Rank
+    result.sort((a, b) => b[sortBy] - a[sortBy]);
+
+    setFilteredPlayers(result);
+  }, [search, players, sortBy]);
+
+  // Helper to get rank index in the global list
+  const getGlobalRank = (player) => {
+    // Sort entire list by active metric to find true rank
+    const sortedAll = [...players].sort((a,b) => b[sortBy] - a[sortBy]);
+    return sortedAll.findIndex(p => p._id === player._id) + 1;
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Search and Filter Section */}
-        <div className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search player or team..."
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                onChange={(e) => handleFilter('search', e.target.value)}
-              />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">League Players</h1>
+          <p className="mt-1 text-gray-500">Click on a player card to view full details</p>
+        </div>
+        
+        <div className="mt-4 md:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+          {/* Sort Dropdown */}
+          <div className="relative">
+             <select 
+               value={sortBy} 
+               onChange={(e) => setSortBy(e.target.value)}
+               className="appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:ring-orange-500 focus:border-orange-500 shadow-sm"
+             >
+               <option value="ppg">Rank by Points (PPG)</option>
+               <option value="rpg">Rank by Rebounds (RPG)</option>
+               <option value="apg">Rank by Assists (APG)</option>
+             </select>
+             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <Filter className="h-4 w-4" />
+             </div>
+          </div>
+
+          <div className="relative rounded-md shadow-sm">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
             </div>
-            <select 
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white"
-              onChange={(e) => handleFilter('position', e.target.value)}
-            >
-              <option value="">All Positions</option>
-              <option value="PG">Point Guard</option>
-              <option value="SG">Shooting Guard</option>
-              <option value="SF">Small Forward</option>
-              <option value="PF">Power Forward</option>
-              <option value="C">Center</option>
-            </select>
+            <input
+              type="text"
+              className="focus:ring-orange-500 focus:border-orange-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-lg py-2"
+              placeholder="Search players or teams..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
         </div>
+      </div>
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl h-96 animate-pulse shadow-sm"></div>
-            ))}
-          </div>
-        ) : error ? (
-           <div className="text-center py-12 text-red-500 bg-white rounded-xl shadow-sm">
-             <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-             <p>{error}</p>
-           </div>
-        ) : (
-          <>
-            {/* Players Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {players.map(player => (
-                <div key={player._id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
-                  <div className="h-64 overflow-hidden bg-gray-100 relative">
-                    {player.imageUrl ? (
-                      <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">No Image</div>
-                    )}
-                    <div className="absolute top-2 right-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded">
+      {loading ? (
+        <div className="text-center py-12">
+           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredPlayers.map((player) => (
+            <div 
+              key={player._id} 
+              onClick={() => setSelectedPlayer(player)}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative group"
+            >
+               {/* Rank Badge */}
+               <div className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full z-10 shadow-md">
+                 #{getGlobalRank(player)} in {sortBy.toUpperCase()}
+               </div>
+
+              <div className="aspect-w-16 aspect-h-12 bg-gray-50 relative overflow-hidden">
+                 {player.imageUrl && !player.imageUrl.includes('placeholder') ? (
+                    <img
+                    src={player.imageUrl}
+                    alt={player.name}
+                    className="w-full h-56 object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/300x300?text=No+Image"; }}
+                    />
+                 ) : (
+                    <div className="w-full h-56 flex items-center justify-center bg-indigo-50 text-indigo-200">
+                        <User className="h-24 w-24" />
+                    </div>
+                 )}
+                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
+                 <div className="absolute bottom-3 left-3 text-white">
+                    <h3 className="text-lg font-bold leading-tight">{player.name}</h3>
+                    <p className="text-xs opacity-90">{player.team}</p>
+                 </div>
+              </div>
+
+              <div className="p-4">
+                <div className="flex justify-between items-center mb-3">
+                   <span className="text-xs font-bold px-2 py-1 bg-gray-100 text-gray-600 rounded">
                       {player.position}
-                    </div>
+                   </span>
+                   <span className="text-xs text-gray-500 font-mono">#{player.jerseyNumber}</span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-orange-50 rounded p-2">
+                    <p className="text-[10px] text-orange-600 font-bold uppercase">PPG</p>
+                    <p className="text-lg font-extrabold text-gray-900">{player.ppg}</p>
                   </div>
-                  <div className="p-4">
-                    <h3 className="text-lg font-bold text-gray-900 truncate">{player.name}</h3>
-                    <p className="text-sm text-gray-500 mb-4">{player.team}</p>
-                    <div className="grid grid-cols-3 gap-2 border-t pt-4">
-                      <div className="text-center">
-                        <span className="block text-xs text-gray-400">PPG</span>
-                        <span className="font-bold text-gray-800">{player.ppg}</span>
-                      </div>
-                      <div className="text-center border-l border-gray-100">
-                        <span className="block text-xs text-gray-400">RPG</span>
-                        <span className="font-bold text-gray-800">{player.rpg}</span>
-                      </div>
-                      <div className="text-center border-l border-gray-100">
-                        <span className="block text-xs text-gray-400">APG</span>
-                        <span className="font-bold text-gray-800">{player.apg}</span>
-                      </div>
-                    </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <p className="text-[10px] text-gray-500 font-bold uppercase">RPG</p>
+                    <p className="text-lg font-bold text-gray-900">{player.rpg}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <p className="text-[10px] text-gray-500 font-bold uppercase">APG</p>
+                    <p className="text-lg font-bold text-gray-900">{player.apg}</p>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
+          ))}
+        </div>
+      )}
 
-            {/* Pagination */}
-            {pagination.pages > 1 && (
-              <div className="flex justify-center mt-8 gap-2">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage(p => p - 1)}
-                  className="p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50"
+      {/* Player Details Modal */}
+      {selectedPlayer && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            
+            {/* Background Overlay */}
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setSelectedPlayer(null)}></div>
+
+            {/* Center Modal */}
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full border border-gray-200">
+              
+              <div className="relative h-32 bg-gradient-to-r from-indigo-900 to-blue-800">
+                 <button onClick={() => setSelectedPlayer(null)} className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/20 rounded-full p-1 hover:bg-black/40 transition">
+                    <X className="h-6 w-6" />
+                 </button>
+                 <div className="absolute -bottom-12 left-6 p-1 bg-white rounded-full">
+                    <div className="h-24 w-24 bg-gray-200 rounded-full overflow-hidden flex items-center justify-center border-4 border-white shadow-lg">
+                        {selectedPlayer.imageUrl ? (
+                            <img src={selectedPlayer.imageUrl} className="h-full w-full object-cover" alt="" />
+                        ) : <User className="h-12 w-12 text-gray-400" />}
+                    </div>
+                 </div>
+              </div>
+
+              <div className="pt-14 px-6 pb-6">
+                 <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="text-2xl font-bold text-gray-900">{selectedPlayer.name}</h3>
+                        <p className="text-sm font-medium text-orange-600">{selectedPlayer.team}</p>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-3xl font-extrabold text-gray-900">{selectedPlayer.jerseyNumber}</div>
+                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wide">{selectedPlayer.position}</div>
+                    </div>
+                 </div>
+
+                 <div className="mt-8">
+                    <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4 border-b pb-2">Season Statistics</h4>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                       <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
+                          <span className="block text-2xl font-black text-gray-900">{selectedPlayer.ppg}</span>
+                          <span className="text-xs text-gray-500 font-semibold uppercase">PTS</span>
+                       </div>
+                       <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
+                          <span className="block text-2xl font-black text-gray-900">{selectedPlayer.rpg}</span>
+                          <span className="text-xs text-gray-500 font-semibold uppercase">REB</span>
+                       </div>
+                       <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
+                          <span className="block text-2xl font-black text-gray-900">{selectedPlayer.apg}</span>
+                          <span className="text-xs text-gray-500 font-semibold uppercase">AST</span>
+                       </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                       <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
+                          <span className="block text-xl font-bold text-gray-900">{selectedPlayer.spg}</span>
+                          <span className="text-xs text-gray-500 font-semibold uppercase">STL</span>
+                       </div>
+                       <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
+                          <span className="block text-xl font-bold text-gray-900">{selectedPlayer.bpg}</span>
+                          <span className="text-xs text-gray-500 font-semibold uppercase">BLK</span>
+                       </div>
+                       <div className="bg-blue-50 p-3 rounded-xl text-center border border-blue-100">
+                          <span className="block text-xl font-bold text-blue-700">{selectedPlayer.gamesPlayed}</span>
+                          <span className="text-xs text-blue-600 font-semibold uppercase">Games</span>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
+                <button 
+                  type="button" 
+                  className="inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+                  onClick={() => setSelectedPlayer(null)}
                 >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <span className="px-4 py-2 bg-white border rounded-lg font-medium">{page} / {pagination.pages}</span>
-                <button
-                  disabled={page === pagination.pages}
-                  onClick={() => setPage(p => p + 1)}
-                  className="p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <ChevronRight className="w-5 h-5" />
+                  Close
                 </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
