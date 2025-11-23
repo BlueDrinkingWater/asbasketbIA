@@ -14,12 +14,15 @@ export const loginUser = (data) => API.post('/auth/login', data);
 export const fetchUsers = () => API.get('/auth/users');
 export const updateUserStatus = (userId, status) => API.put('/auth/status', { userId, status });
 
-// Teams
+// Teams & Standings
 export const fetchTeams = () => API.get('/teams');
+// Added alias for clarity in Standings page
+export const fetchStandings = () => API.get('/teams'); 
 export const createTeam = (data) => API.post('/teams', data);
 
 // Players
-export const fetchPlayers = () => API.get('/players');
+// Updated to accept query params (limit, page, sort)
+export const fetchPlayers = (params) => API.get('/players', { params });
 export const createPlayer = (data) => API.post('/players', data, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });

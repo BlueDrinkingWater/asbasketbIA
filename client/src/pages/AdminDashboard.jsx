@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Calendar, Settings, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { Users, Calendar, Activity, CheckCircle, XCircle, ExternalLink, LayoutDashboard } from 'lucide-react';
 import { fetchUsers, updateUserStatus } from '../services/api';
 import toast from 'react-hot-toast';
 
+// Import your new Admin Components
+import AddGame from './AddGame';
+import AddStats from './AddStats';
+
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('stats'); // Default to Stats for quick access
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch users on mount
+  // Only load users if that tab is active to save bandwidth
   useEffect(() => {
-    loadUsers();
-  }, []);
+    if (activeTab === 'users') {
+      loadUsers();
+    }
+  }, [activeTab]);
 
   const loadUsers = async () => {
+    setLoading(true);
     try {
       const { data } = await fetchUsers();
       if (data.success) setUsers(data.data);
@@ -28,7 +35,7 @@ const AdminDashboard = () => {
     try {
       await updateUserStatus(userId, status);
       toast.success(`User marked as ${status}`);
-      loadUsers(); // Refresh list
+      loadUsers(); 
     } catch (error) {
       toast.error("Update failed");
     }
@@ -44,62 +51,103 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
+    <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen bg-gray-50">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8 flex items-center gap-3">
+        <LayoutDashboard className="w-8 h-8 text-indigo-600" /> Admin Control Panel
+      </h1>
       
-      <div className="flex space-x-4 mb-6 border-b overflow-x-auto">
-        <button onClick={() => setActiveTab('users')} className={`pb-2 px-4 whitespace-nowrap ${activeTab === 'users' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500'}`}>
+      {/* Navigation Tabs */}
+      <div className="flex space-x-6 mb-8 border-b border-gray-200 overflow-x-auto">
+        <button 
+          onClick={() => setActiveTab('stats')} 
+          className={`pb-4 px-2 whitespace-nowrap font-medium text-sm transition-colors ${activeTab === 'stats' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          <Activity className="inline w-4 h-4 mr-2" /> Player Stats
+        </button>
+        <button 
+          onClick={() => setActiveTab('games')} 
+          className={`pb-4 px-2 whitespace-nowrap font-medium text-sm transition-colors ${activeTab === 'games' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          <Calendar className="inline w-4 h-4 mr-2" /> Game Schedule
+        </button>
+        <button 
+          onClick={() => setActiveTab('users')} 
+          className={`pb-4 px-2 whitespace-nowrap font-medium text-sm transition-colors ${activeTab === 'users' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+        >
           <Users className="inline w-4 h-4 mr-2" /> Subscriptions
         </button>
-        {/* Add other tabs logic later */}
       </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
+      {/* Tab Content */}
+      <div className="bg-white shadow-sm rounded-2xl p-1 border border-gray-100 min-h-[500px]">
+        
+        {activeTab === 'stats' && (
+          <div className="p-4">
+            {/* Reusing your AddStats component */}
+            <AddStats />
+          </div>
+        )}
+
+        {activeTab === 'games' && (
+          <div className="p-4">
+            {/* Reusing your AddGame component */}
+            <AddGame />
+          </div>
+        )}
+
         {activeTab === 'users' && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">User Subscriptions</h2>
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800">User Management</h2>
+              <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium">
+                Total: {users.length}
+              </span>
+            </div>
+
             {loading ? (
-              <p>Loading...</p>
+              <div className="text-center py-12 text-gray-500 animate-pulse">Loading user data...</div>
             ) : (
               <div className="space-y-4">
-                {users.length === 0 && <p className="text-gray-500">No users found.</p>}
+                {users.length === 0 && <p className="text-center py-10 text-gray-500">No users found.</p>}
                 
                 {users.map(user => (
-                  <div key={user._id} className="border rounded-lg p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-gray-50 transition">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-bold text-lg">{user.name}</p>
-                        <span className={`text-xs px-2 py-1 rounded-full uppercase font-bold ${getStatusColor(user.subscriptionStatus)}`}>
+                  <div key={user._id} className="border border-gray-100 rounded-xl p-5 flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow bg-white">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <p className="font-bold text-lg text-gray-900">{user.name}</p>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wide ${getStatusColor(user.subscriptionStatus)}`}>
                           {user.subscriptionStatus}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600">{user.email} | {user.contactNumber}</p>
+                      <p className="text-sm text-gray-500 mb-1">{user.email} • {user.contactNumber}</p>
                       
-                      {user.subscriptionExpiresAt && (
-                        <p className="text-xs text-gray-500 mt-1">Expires: {new Date(user.subscriptionExpiresAt).toLocaleDateString()}</p>
-                      )}
-                      
-                      {user.paymentProofUrl ? (
-                        <a href={user.paymentProofUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 text-sm flex items-center gap-1 mt-1 hover:underline">
-                          <ExternalLink className="w-3 h-3" /> View Payment Proof
-                        </a>
-                      ) : (
-                        <span className="text-xs text-red-400">No proof uploaded</span>
-                      )}
+                      <div className="flex gap-4 text-xs mt-2">
+                        {user.subscriptionExpiresAt && (
+                          <span className="text-gray-400">Expires: {new Date(user.subscriptionExpiresAt).toLocaleDateString()}</span>
+                        )}
+                        
+                        {user.paymentProofUrl ? (
+                          <a href={user.paymentProofUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 flex items-center gap-1 font-medium hover:underline">
+                            <ExternalLink className="w-3 h-3" /> View Payment Proof
+                          </a>
+                        ) : (
+                          <span className="text-red-400 flex items-center gap-1"><XCircle className="w-3 h-3" /> No Proof</span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-3 w-full md:w-auto">
                       {user.subscriptionStatus !== 'active' && (
                         <button 
                           onClick={() => handleStatusUpdate(user._id, 'active')}
-                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
+                          className="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
                         >
-                          <CheckCircle className="w-4 h-4" /> Approve (30 Days)
+                          <CheckCircle className="w-4 h-4" /> Approve
                         </button>
                       )}
                       <button 
                         onClick={() => handleStatusUpdate(user._id, 'inactive')}
-                        className="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-2 rounded text-sm flex items-center gap-2"
+                        className="flex-1 md:flex-none bg-white border border-red-200 text-red-600 hover:bg-red-50 px-5 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-95"
                       >
                         <XCircle className="w-4 h-4" /> Revoke
                       </button>

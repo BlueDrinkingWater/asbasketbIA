@@ -14,6 +14,7 @@ export const getPlayers = async (req, res, next) => {
     if (position) query.position = position;
     if (team) query.team = { $regex: team, $options: 'i' };
 
+    // Sort by PPG descending to show best players first
     const players = await Player.find(query)
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -37,18 +38,22 @@ export const getPlayers = async (req, res, next) => {
 
 export const createPlayer = async (req, res, next) => {
   try {
-    // Check if image file exists
     if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please upload an image' });
+      return res.status(400).json({ success: false, message: 'Please upload a player photo' });
     }
 
-    // Construct full URL for the uploaded image
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-
+    // FIX: Use Cloudinary's secure_url from req.file.path
+    // The previous code tried to build a local URL which won't work with Cloudinary
     const player = await Player.create({
       ...req.body,
-      imageUrl: imageUrl
+      imageUrl: req.file.path 
     });
+
+    // --- Socket.io Emit ---
+    // Update the public leaderboard immediately
+    const io = req.app.get('io');
+    io.emit('players_updated', { message: 'New player stats added' });
+    // ----------------------
 
     res.status(201).json({
       success: true,
@@ -63,9 +68,8 @@ export const getPlayerById = async (req, res, next) => {
   try {
     const player = await Player.findById(req.params.id);
     if (!player) {
-      const error = new Error('Player not found');
-      error.statusCode = 404;
-      throw error;
+      res.status(404);
+      throw new Error('Player not found');
     }
     res.status(200).json({ success: true, data: player });
   } catch (error) {
