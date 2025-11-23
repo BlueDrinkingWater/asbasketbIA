@@ -37,11 +37,19 @@ export const getPlayers = async (req, res, next) => {
 
 export const createPlayer = async (req, res, next) => {
   try {
-    const player = await Player.create(req.body);
-    res.status(201).json({
-      success: true,
-      data: player
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please upload an image' });
+    }
+
+    // Create full URL for the image
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+    const player = await Player.create({
+      ...req.body,
+      imageUrl: imageUrl
     });
+
+    res.status(201).json({ success: true, data: player });
   } catch (error) {
     next(error);
   }
