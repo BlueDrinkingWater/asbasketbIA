@@ -11,9 +11,9 @@ const GameTicker = () => {
       try {
         const { data } = await fetchGames();
         if (data.success) {
-          // Filter for relevant games (e.g., sorted by date)
-          // For demo, we duplicate the list to ensure scrolling looks continuous
+          // Sort by date (newest first)
           const sorted = data.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+          // Duplicate list for infinite scroll effect
           setGames([...sorted, ...sorted]); 
         }
       } catch (error) {
@@ -43,7 +43,7 @@ const GameTicker = () => {
                 <span className="text-red-500 font-bold flex items-center animate-pulse">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span> LIVE
                 </span>
-              ) : game.status === 'finished' ? (
+              ) : game.status === 'Final' ? ( // Changed 'finished' to 'Final' to match your backend
                 <span className="font-bold text-gray-500">FINAL</span>
               ) : (
                 <span className="flex items-center">
@@ -55,15 +55,17 @@ const GameTicker = () => {
             {/* Teams & Scores */}
             <div className="flex space-x-3 items-center">
               <div className="flex items-center space-x-2">
+                {/* FIX: Added .name to access the team name string */}
                 <span className={`font-bold uppercase ${game.homeScore > game.awayScore ? 'text-white' : 'text-gray-400'}`}>
-                  {game.homeTeam}
+                  {game.homeTeam?.name || 'TBD'} 
                 </span>
                 <span className="text-gray-500 text-[10px] bg-gray-800 px-1 rounded">vs</span>
+                {/* FIX: Added .name to access the team name string */}
                 <span className={`font-bold uppercase ${game.awayScore > game.homeScore ? 'text-white' : 'text-gray-400'}`}>
-                  {game.awayTeam}
+                  {game.awayTeam?.name || 'TBD'}
                 </span>
               </div>
-              {(game.status === 'finished' || game.status === 'live') && (
+              {(game.status === 'Final' || game.status === 'live') && (
                 <div className="font-mono font-bold text-yellow-400">
                   {game.homeScore} - {game.awayScore}
                 </div>

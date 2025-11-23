@@ -1,3 +1,4 @@
+// client/src/pages/AdminDashboard.jsx
 import React, { useEffect, useState } from 'react';
 import { 
   fetchAdminData, 
@@ -13,19 +14,32 @@ import {
 import toast from 'react-hot-toast';
 import { 
   Check, X, User, Users, Activity, Calendar, 
-  Loader, Plus, Settings, Shield, Upload 
+  Loader, Plus, Settings, Shield, Upload, Trophy, Trash2 
 } from 'lucide-react';
 
 const AdminDashboard = () => {
   const [data, setData] = useState(null);
-  const [teamsList, setTeamsList] = useState([]); // For dropdowns
+  const [teamsList, setTeamsList] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('users'); // users, teams, stats, games, manage
+  const [activeTab, setActiveTab] = useState('users'); 
 
   // Management Forms State
-  const [manageTab, setManageTab] = useState('addTeam'); // addTeam, addPlayer, addGame
+  const [manageTab, setManageTab] = useState('addTeam'); 
   const [teamForm, setTeamForm] = useState({ name: '', conference: 'East', logoUrl: '' });
-  const [gameForm, setGameForm] = useState({ homeTeam: '', awayTeam: '', date: '', location: '' });
+  
+  const [gameForm, setGameForm] = useState({ 
+    homeTeam: '', awayTeam: '', date: '', location: '' 
+  });
+
+  // --- DYNAMIC TOURNAMENT STATE ---
+  const [tourneySettings, setTourneySettings] = useState({
+    roundName: 'Preliminary', // Default round name
+    date: '',
+    location: ''
+  });
+  // Start with 1 empty matchup row
+  const [matchups, setMatchups] = useState([{ id: 1, home: '', away: '' }]);
+
   const [playerForm, setPlayerForm] = useState({ 
     name: '', team: '', position: 'PG', jerseyNumber: '', 
     ppg: 0, rpg: 0, apg: 0, image: null 
@@ -55,7 +69,7 @@ const AdminDashboard = () => {
     loadData();
   }, []);
 
-  // --- Approval Handlers ---
+  // --- Handlers for Dashboard Actions ---
   const handleSubAction = async (userId, status) => {
     try {
       await updateSubscription({ userId, status });
@@ -88,14 +102,15 @@ const AdminDashboard = () => {
     } catch (e) { toast.error('Action failed'); }
   };
 
-  // --- Creation Handlers ---
+  // --- Single Creation Handlers ---
   const handleCreateTeam = async (e) => {
     e.preventDefault();
+    if (!teamForm.name.trim()) return toast.error("Team name is required");
     try {
       await createTeam(teamForm);
       toast.success('Team created successfully!');
       setTeamForm({ name: '', conference: 'East', logoUrl: '' });
-      loadData(); // Refresh teams list
+      loadData(); 
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create team');
     }
@@ -103,8 +118,11 @@ const AdminDashboard = () => {
 
   const handleCreateGame = async (e) => {
     e.preventDefault();
+    if (!gameForm.homeTeam || !gameForm.awayTeam) return toast.error("Select both teams");
+    if (gameForm.homeTeam === gameForm.awayTeam) return toast.error("Teams must be different");
+    
     try {
-      await createGame(gameForm);
+      await createGame({ ...gameForm, round: 'Regular Season' });
       toast.success('Game scheduled successfully!');
       setGameForm({ homeTeam: '', awayTeam: '', date: '', location: '' });
     } catch (err) {
@@ -115,9 +133,7 @@ const AdminDashboard = () => {
   const handleCreatePlayer = async (e) => {
     e.preventDefault();
     const formData = new FormData();
-    Object.keys(playerForm).forEach(key => {
-      formData.append(key, playerForm[key]);
-    });
+    Object.keys(playerForm).forEach(key => formData.append(key, playerForm[key]));
 
     try {
       await createPlayer(formData);
@@ -125,6 +141,74 @@ const AdminDashboard = () => {
       setPlayerForm({ name: '', team: '', position: 'PG', jerseyNumber: '', ppg: 0, rpg: 0, apg: 0, image: null });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add player');
+    }
+  };
+
+  // --- Tournament Batch Logic ---
+  
+  // Add a new empty row
+  const addMatchupRow = () => {
+    setMatchups([...matchups, { id: Date.now(), home: '', away: '' }]);
+  };
+
+  // Remove a row
+  const removeMatchupRow = (id) => {
+    if (matchups.length === 1) return; // Keep at least one
+    setMatchups(matchups.filter(m => m.id !== id));
+  };
+
+  // Update specific row data
+  const updateMatchup = (id, field, value) => {
+    setMatchups(matchups.map(m => m.id === id ? { ...m, [field]: value } : m));
+  };
+
+  // Validate and Submit Batch
+  const handleBatchSchedule = async (e) => {
+    e.preventDefault();
+    const { roundName, date, location } = tourneySettings;
+
+    // 1. Basic Validation
+    if (!date || !location) return toast.error("Please set Date and Location for this round.");
+    if (!roundName) return toast.error("Please name this round (e.g. Semi-Finals).");
+
+    // 2. Check Matchups
+    const usedTeams = new Set();
+    const validGames = [];
+
+    for (let m of matchups) {
+      // Skip empty rows if user left them blank, or alert? Let's alert.
+      if (!m.home || !m.away) return toast.error("All added matchup rows must have teams selected.");
+      if (m.home === m.away) return toast.error("A team cannot play against itself.");
+      
+      // Check for duplicates in the batch
+      if (usedTeams.has(m.home) || usedTeams.has(m.away)) {
+        return toast.error("A team is selected more than once in this batch.");
+      }
+      usedTeams.add(m.home);
+      usedTeams.add(m.away);
+
+      validGames.push({
+        homeTeam: m.home,
+        awayTeam: m.away,
+        date,
+        location,
+        round: roundName,
+        status: 'scheduled'
+      });
+    }
+
+    // 3. Submit All
+    try {
+      const promises = validGames.map(gameData => createGame(gameData));
+      await Promise.all(promises);
+      toast.success(`Successfully scheduled ${validGames.length} games for ${roundName}!`);
+      
+      // Reset
+      setMatchups([{ id: Date.now(), home: '', away: '' }]);
+      setTourneySettings({ ...tourneySettings, date: '', location: '' });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create batch schedule.");
     }
   };
 
@@ -152,11 +236,12 @@ const AdminDashboard = () => {
           { id: 'stats', label: 'Stat Updates', icon: Activity, count: data?.statRequests?.length },
           { id: 'games', label: 'Game Signups', icon: Calendar, count: data?.gameRequests?.length },
           { id: 'manage', label: 'Manage League', icon: Settings, count: 0 },
+          { id: 'tournament', label: 'Tournament Batch', icon: Trophy, count: 0 },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center px-4 py-3 rounded-t-lg font-medium text-sm transition-all ${
+            className={`flex items-center px-4 py-3 rounded-t-lg font-medium text-sm transition-all whitespace-nowrap ${
               activeTab === tab.id 
                 ? 'bg-white text-orange-600 border-b-2 border-orange-500 shadow-sm' 
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -192,7 +277,6 @@ const AdminDashboard = () => {
                     <div className="mb-4 sm:mb-0">
                       <h3 className="text-lg font-bold text-gray-900">{user.name}</h3>
                       <p className="text-sm text-gray-600">{user.email}</p>
-                      <p className="text-sm text-gray-500 mt-1">Contact: {user.contactNumber || 'N/A'}</p>
                       {user.paymentProofUrl && (
                         <a href={user.paymentProofUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline mt-2 inline-flex items-center">
                           <Upload className="w-3 h-3 mr-1" /> View Proof
@@ -200,12 +284,8 @@ const AdminDashboard = () => {
                       )}
                     </div>
                     <div className="flex space-x-3">
-                      <button onClick={() => handleSubAction(user._id, 'rejected')} className="flex items-center px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors shadow-sm text-sm font-medium">
-                        <X className="w-4 h-4 mr-2" /> Reject
-                      </button>
-                      <button onClick={() => handleSubAction(user._id, 'active')} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-sm font-medium">
-                        <Check className="w-4 h-4 mr-2" /> Approve
-                      </button>
+                      <button onClick={() => handleSubAction(user._id, 'rejected')} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm">Reject</button>
+                      <button onClick={() => handleSubAction(user._id, 'active')} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Approve</button>
                     </div>
                   </div>
                 ))}
@@ -227,31 +307,21 @@ const AdminDashboard = () => {
               <div className="grid grid-cols-1 gap-6">
                 {data.teamRequests.map(user => (
                   <div key={user._id} className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm">
-                    <div className="flex justify-between items-start mb-6">
+                    <div className="flex justify-between items-start mb-4">
                       <div>
-                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase tracking-wide">New Application</span>
-                        <h3 className="text-2xl font-bold text-gray-900 mt-2">{user.teamRegistration.teamName}</h3>
-                        <p className="text-sm text-gray-500 mt-1">Captain: {user.name} ({user.email})</p>
-                        <p className="text-sm text-gray-500">Conference: {user.teamRegistration.conference}</p>
+                        <h3 className="text-2xl font-bold text-gray-900">{user.teamRegistration.teamName}</h3>
+                        <p className="text-sm text-gray-500">Captain: {user.name}</p>
                       </div>
                       <div className="flex space-x-2">
-                        <button onClick={() => handleTeamAction(user._id, 'reject')} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"><X /></button>
-                        <button onClick={() => handleTeamAction(user._id, 'approve')} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition"><Check /></button>
+                        <button onClick={() => handleTeamAction(user._id, 'reject')} className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100"><X /></button>
+                        <button onClick={() => handleTeamAction(user._id, 'approve')} className="p-2 bg-green-50 text-green-600 rounded hover:bg-green-100"><Check /></button>
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Roster Preview</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {user.teamRegistration.roster.map((p, idx) => (
-                          <div key={idx} className="flex items-center bg-white p-2 rounded border border-gray-200">
-                            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500 mr-3">
-                              {p.jerseyNumber}
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">{p.name}</p>
-                              <p className="text-xs text-gray-500">{p.position}</p>
-                            </div>
-                          </div>
+                    <div className="bg-gray-50 p-4 rounded">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Roster</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {user.teamRegistration.roster.map((p, i) => (
+                          <div key={i} className="text-sm text-gray-700">{p.jerseyNumber} - {p.name} ({p.position})</div>
                         ))}
                       </div>
                     </div>
@@ -265,57 +335,48 @@ const AdminDashboard = () => {
         {/* 3. STAT UPDATES */}
         {activeTab === 'stats' && (
           <div className="p-6">
-             <h2 className="text-xl font-bold mb-4 text-gray-800">Player Stat Updates</h2>
+             <h2 className="text-xl font-bold mb-4 text-gray-800">Stat Updates</h2>
              {data?.statRequests?.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                 <Activity className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-                <p className="text-gray-500">No pending stat updates.</p>
+                <p className="text-gray-500">No pending updates.</p>
               </div>
             ) : (
-              <div className="overflow-hidden border border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Submitted By</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Player</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Game Stats</th>
-                      <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">User</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Player</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Stats</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {data.statRequests.map((req) => (
+                    <tr key={req.reqId}>
+                      <td className="px-6 py-4 text-sm text-gray-600">{req.userName}</td>
+                      <td className="px-6 py-4 text-sm font-bold">{req.playerName}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className="mr-2">PTS: {req.stats?.ppg}</span>
+                        <span className="mr-2">REB: {req.stats?.rpg}</span>
+                        <span>AST: {req.stats?.apg}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button onClick={() => handleStatAction(req.userId, req.reqId, 'approve')} className="text-green-600 hover:underline">Approve</button>
+                        <button onClick={() => handleStatAction(req.userId, req.reqId, 'reject')} className="text-red-600 hover:underline">Reject</button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {data.statRequests.map((req) => (
-                      <tr key={req.reqId} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{req.userName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{req.playerName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {/* CRASH FIX: Safe accessors with default values */}
-                          <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold mr-2">
-                            PTS: {req.stats?.ppg || 0}
-                          </span>
-                          <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-bold mr-2">
-                            REB: {req.stats?.rpg || 0}
-                          </span>
-                          <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-bold">
-                            AST: {req.stats?.apg || 0}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                          <button onClick={() => handleStatAction(req.userId, req.reqId, 'approve')} className="text-green-600 hover:text-green-900 font-semibold">Approve</button>
-                          <button onClick={() => handleStatAction(req.userId, req.reqId, 'reject')} className="text-red-600 hover:text-red-900 font-semibold">Reject</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         )}
 
-        {/* 4. GAME REGISTRATIONS */}
+        {/* 4. GAME REQUESTS */}
         {activeTab === 'games' && (
            <div className="p-6">
-           <h2 className="text-xl font-bold mb-4 text-gray-800">Game Registrations</h2>
+           <h2 className="text-xl font-bold mb-4 text-gray-800">Game Signups</h2>
            {data?.gameRequests?.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                <Calendar className="mx-auto h-12 w-12 text-gray-300 mb-3" />
@@ -324,17 +385,14 @@ const AdminDashboard = () => {
           ) : (
             <div className="grid gap-4">
               {data.gameRequests.map(req => (
-                <div key={req.reqId} className="border border-gray-200 rounded-lg p-4 flex flex-col sm:flex-row justify-between items-center bg-white shadow-sm">
-                  <div className="mb-3 sm:mb-0">
-                    <p className="font-bold text-lg text-gray-800">{req.teamName}</p>
-                    <div className="text-sm text-gray-500 flex items-center mt-1">
-                       <span className="bg-gray-100 px-2 py-0.5 rounded mr-2">Game ID: {req.gameId?.substring(0,8) || '...'}...</span>
-                       <span>By: {req.userName}</span>
-                    </div>
+                <div key={req.reqId} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center bg-white">
+                  <div>
+                    <p className="font-bold">{req.teamName}</p>
+                    <p className="text-sm text-gray-500">Requested by: {req.userName}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button onClick={() => handleGameAction(req.userId, req.reqId, 'approve')} className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-sm font-semibold transition">Approve</button>
-                    <button onClick={() => handleGameAction(req.userId, req.reqId, 'reject')} className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 text-sm font-semibold transition">Reject</button>
+                    <button onClick={() => handleGameAction(req.userId, req.reqId, 'approve')} className="text-green-600">Approve</button>
+                    <button onClick={() => handleGameAction(req.userId, req.reqId, 'reject')} className="text-red-600">Reject</button>
                   </div>
                 </div>
               ))}
@@ -343,7 +401,127 @@ const AdminDashboard = () => {
         </div>
         )}
 
-        {/* 5. MANAGEMENT TAB (New Features) */}
+        {/* 5. TOURNAMENT BATCH SCHEDULER (UPDATED) */}
+        {activeTab === 'tournament' && (
+          <div className="p-8">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 mb-8">
+              <div className="flex items-center mb-4">
+                <Trophy className="text-orange-600 w-6 h-6 mr-2" />
+                <h2 className="text-xl font-bold text-gray-900">Tournament Batch Scheduler</h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-6">
+                Schedule multiple games at once for a specific round (Preliminary, Semi-Finals, Finals, etc.).
+              </p>
+
+              <form onSubmit={handleBatchSchedule}>
+                
+                {/* 1. Round Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Round Name</label>
+                    <input 
+                      type="text" 
+                      list="round-suggestions"
+                      placeholder="e.g. Semi-Finals" 
+                      className="w-full border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm"
+                      value={tourneySettings.roundName}
+                      onChange={e => setTourneySettings({...tourneySettings, roundName: e.target.value})}
+                    />
+                    <datalist id="round-suggestions">
+                      <option value="Preliminary" />
+                      <option value="Quarter-Finals" />
+                      <option value="Semi-Finals" />
+                      <option value="Finals" />
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date & Time</label>
+                    <input 
+                      type="datetime-local" 
+                      required 
+                      className="w-full border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm"
+                      value={tourneySettings.date} 
+                      onChange={e => setTourneySettings({...tourneySettings, date: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="Arena Name" 
+                      className="w-full border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm"
+                      value={tourneySettings.location} 
+                      onChange={e => setTourneySettings({...tourneySettings, location: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Matchups Builder */}
+                <div className="space-y-3 mb-6">
+                  {matchups.map((matchup, index) => (
+                    <div key={matchup.id} className="flex items-center gap-4 bg-white p-3 rounded border border-gray-200">
+                      <div className="text-sm font-bold text-gray-400 w-6">#{index + 1}</div>
+                      
+                      <div className="flex-1">
+                        <select 
+                          className="w-full border-gray-300 rounded text-sm"
+                          value={matchup.home}
+                          onChange={e => updateMatchup(matchup.id, 'home', e.target.value)}
+                        >
+                          <option value="">Select Home Team</option>
+                          {teamsList.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                        </select>
+                      </div>
+
+                      <div className="font-bold text-gray-300 text-xs">VS</div>
+
+                      <div className="flex-1">
+                        <select 
+                          className="w-full border-gray-300 rounded text-sm"
+                          value={matchup.away}
+                          onChange={e => updateMatchup(matchup.id, 'away', e.target.value)}
+                        >
+                          <option value="">Select Away Team</option>
+                          {teamsList.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                        </select>
+                      </div>
+
+                      <button 
+                        type="button" 
+                        onClick={() => removeMatchupRow(matchup.id)}
+                        className="text-gray-400 hover:text-red-500 transition p-1"
+                        disabled={matchups.length === 1}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between">
+                  <button 
+                    type="button" 
+                    onClick={addMatchupRow}
+                    className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Matchup
+                  </button>
+
+                  <button 
+                    type="submit" 
+                    className="flex items-center justify-center px-6 py-2 border border-transparent text-sm font-bold rounded-md text-white bg-orange-600 hover:bg-orange-700 shadow-md transition-all"
+                  >
+                    <Calendar className="w-4 h-4 mr-2" /> Schedule {matchups.length} Games
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 6. MANAGE TAB (Creation Forms) */}
         {activeTab === 'manage' && (
           <div className="flex flex-col md:flex-row h-full">
             {/* Sidebar */}
@@ -365,7 +543,7 @@ const AdminDashboard = () => {
                    onClick={() => setManageTab('addGame')} 
                    className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition ${manageTab === 'addGame' ? 'bg-orange-100 text-orange-800' : 'text-gray-600 hover:bg-gray-100'}`}
                  >
-                    <Calendar className="w-4 h-4 inline mr-2"/> Schedule Game
+                    <Calendar className="w-4 h-4 inline mr-2"/> Single Game
                  </button>
                </div>
             </div>
@@ -406,7 +584,7 @@ const AdminDashboard = () => {
 
               {manageTab === 'addGame' && (
                 <form onSubmit={handleCreateGame} className="max-w-lg">
-                   <h3 className="text-xl font-bold text-gray-900 mb-6">Schedule New Game</h3>
+                   <h3 className="text-xl font-bold text-gray-900 mb-6">Schedule Single Game</h3>
                    <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                          <div>
@@ -415,7 +593,7 @@ const AdminDashboard = () => {
                                value={gameForm.homeTeam} onChange={e => setGameForm({...gameForm, homeTeam: e.target.value})}
                             >
                               <option value="">Select Team</option>
-                              {teamsList.map(t => <option key={t._id} value={t.name}>{t.name}</option>)}
+                              {teamsList.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                             </select>
                          </div>
                          <div>
@@ -424,7 +602,7 @@ const AdminDashboard = () => {
                                value={gameForm.awayTeam} onChange={e => setGameForm({...gameForm, awayTeam: e.target.value})}
                             >
                               <option value="">Select Team</option>
-                              {teamsList.map(t => <option key={t._id} value={t.name}>{t.name}</option>)}
+                              {teamsList.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                             </select>
                          </div>
                       </div>
@@ -436,7 +614,7 @@ const AdminDashboard = () => {
                       </div>
                       <div>
                          <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                         <input type="text" required placeholder="Arena Name" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 py-2 px-3 border"
+                         <input type="text" required placeholder="e.g. Staples Center" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 py-2 px-3 border"
                            value={gameForm.location} onChange={e => setGameForm({...gameForm, location: e.target.value})}
                          />
                       </div>
@@ -455,7 +633,7 @@ const AdminDashboard = () => {
                       <div className="space-y-4">
                         <div>
                            <label className="block text-sm font-medium text-gray-700 mb-1">Player Name</label>
-                           <input type="text" required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 py-2 px-3 border"
+                           <input type="text" required placeholder="Full Name" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 py-2 px-3 border"
                              value={playerForm.name} onChange={e => setPlayerForm({...playerForm, name: e.target.value})}
                            />
                         </div>
@@ -479,7 +657,7 @@ const AdminDashboard = () => {
                             </div>
                             <div>
                                <label className="block text-sm font-medium text-gray-700 mb-1">Jersey #</label>
-                               <input type="number" required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 py-2 px-3 border"
+                               <input type="number" required placeholder="0" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 py-2 px-3 border"
                                  value={playerForm.jerseyNumber} onChange={e => setPlayerForm({...playerForm, jerseyNumber: e.target.value})}
                                />
                             </div>
