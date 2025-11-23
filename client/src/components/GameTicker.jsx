@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { fetchGames } from '../services/api';
-import { Calendar, Clock } from 'lucide-react';
 
 const GameTicker = () => {
   const [games, setGames] = useState([]);
@@ -11,9 +10,8 @@ const GameTicker = () => {
       try {
         const { data } = await fetchGames();
         if (data.success) {
-          // Sort by date (newest first)
           const sorted = data.data.sort((a, b) => new Date(b.date) - new Date(a.date));
-          // Duplicate list for infinite scroll effect
+          // Duplicate for infinite scroll effect
           setGames([...sorted, ...sorted]); 
         }
       } catch (error) {
@@ -37,13 +35,13 @@ const GameTicker = () => {
         {games.map((game, idx) => (
           <div key={`${game._id}-${idx}`} className="flex items-center space-x-4 flex-shrink-0 text-xs font-medium border-r border-gray-800 pr-8 last:border-0">
             
-            {/* Game Status / Time */}
+            {/* Game Status */}
             <div className="w-16 text-gray-400 text-[10px] leading-tight">
               {game.status === 'live' ? (
                 <span className="text-red-500 font-bold flex items-center animate-pulse">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span> LIVE
                 </span>
-              ) : game.status === 'Final' ? ( // Changed 'finished' to 'Final' to match your backend
+              ) : game.status === 'Final' ? (
                 <span className="font-bold text-gray-500">FINAL</span>
               ) : (
                 <span className="flex items-center">
@@ -52,15 +50,13 @@ const GameTicker = () => {
               )}
             </div>
 
-            {/* Teams & Scores */}
+            {/* Teams & Scores - FIXED: Safe access to team names */}
             <div className="flex space-x-3 items-center">
               <div className="flex items-center space-x-2">
-                {/* FIX: Added .name to access the team name string */}
                 <span className={`font-bold uppercase ${game.homeScore > game.awayScore ? 'text-white' : 'text-gray-400'}`}>
                   {game.homeTeam?.name || 'TBD'} 
                 </span>
                 <span className="text-gray-500 text-[10px] bg-gray-800 px-1 rounded">vs</span>
-                {/* FIX: Added .name to access the team name string */}
                 <span className={`font-bold uppercase ${game.awayScore > game.homeScore ? 'text-white' : 'text-gray-400'}`}>
                   {game.awayTeam?.name || 'TBD'}
                 </span>

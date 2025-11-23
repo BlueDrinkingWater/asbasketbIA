@@ -1,67 +1,85 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Shield, LogOut, LayoutDashboard, BarChart2 } from 'lucide-react'; 
+import { Menu, X, User, LogOut, LayoutDashboard, Calendar } from 'lucide-react';
 
 const Navbar = () => {
+  const [isOpen, setIsOpen] = React.useState(false);
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('userInfo'));
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
     localStorage.removeItem('userInfo');
     navigate('/login');
   };
 
   return (
-    <nav className="bg-indigo-900 text-white shadow-lg sticky top-0 z-50">
+    <nav className="bg-gray-900 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center space-x-2 font-bold text-xl tracking-wider">
-            <Trophy className="h-6 w-6 text-yellow-400" />
-            <span>HOOP<span className="text-yellow-400">STATS</span></span>
-          </Link>
-
-          <div className="hidden md:flex items-center space-x-8">
-            <Link to="/stats" className="hover:text-yellow-400 transition flex items-center gap-1">
-               <BarChart2 className="w-4 h-4" /> Stats
+          <div className="flex items-center">
+            <Link to="/" className="text-2xl font-black tracking-tighter text-orange-500 uppercase italic">
+              AS<span className="text-white">BASKET</span>BIA
             </Link>
-            <Link to="/players" className="hover:text-yellow-400 transition">Players</Link>
-            <Link to="/standings" className="hover:text-yellow-400 transition">Standings</Link>
-            <Link to="/schedule" className="hover:text-yellow-400 transition">Schedule</Link>
+            <div className="hidden md:block">
+              <div className="ml-10 flex items-baseline space-x-4">
+                <Link to="/" className="hover:text-orange-500 px-3 py-2 rounded-md text-sm font-medium">Home</Link>
+                <Link to="/schedule" className="hover:text-orange-500 px-3 py-2 rounded-md text-sm font-medium">Schedule</Link>
+                <Link to="/stats" className="hover:text-orange-500 px-3 py-2 rounded-md text-sm font-medium">Stats</Link>
+                <Link to="/players" className="hover:text-orange-500 px-3 py-2 rounded-md text-sm font-medium">Players</Link>
+                <Link to="/standings" className="hover:text-orange-500 px-3 py-2 rounded-md text-sm font-medium">Standings</Link>
+              </div>
+            </div>
           </div>
-
-          <div className="flex items-center space-x-4">
-            {user ? (
-              <div className="flex items-center space-x-4">
-                
-                {/* Admin Link */}
-                {user.role === 'admin' ? (
-                  <Link to="/admin" className="flex items-center text-sm bg-red-600 px-3 py-1 rounded hover:bg-red-700 transition">
-                    <Shield className="w-4 h-4 mr-1" /> Admin
-                  </Link>
-                ) : (
-                  /* Subscriber Dashboard Link */
-                  <Link to="/dashboard" className="flex items-center text-sm bg-orange-600 px-3 py-1 rounded hover:bg-orange-700 transition">
-                    <LayoutDashboard className="w-4 h-4 mr-1" /> Dashboard
-                  </Link>
-                )}
-
-                <span className="text-sm text-gray-300 hidden sm:block">Hi, {user.name}</span>
-                <button onClick={handleLogout} className="p-2 hover:bg-indigo-800 rounded-full transition">
-                  <LogOut className="w-5 h-5" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-x-2">
-                <Link to="/login" className="px-4 py-2 text-sm hover:text-white text-gray-200">Login</Link>
-                <Link to="/subscribe" className="px-4 py-2 bg-yellow-500 text-indigo-900 font-bold rounded hover:bg-yellow-400 transition">
-                  Subscribe
+          <div className="hidden md:block">
+            <div className="ml-4 flex items-center md:ml-6">
+              {!user ? (
+                <Link to="/login" className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded text-sm font-medium">
+                  Login / Subscribe
                 </Link>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center space-x-4">
+                  {/* DASHBOARD LINK ADDED HERE */}
+                  <Link to={user.role === 'admin' ? "/admin" : "/dashboard"} className="flex items-center text-gray-300 hover:text-white">
+                    <LayoutDashboard className="w-4 h-4 mr-1" />
+                    {user.role === 'admin' ? "Admin" : "Dashboard"}
+                  </Link>
+                  
+                  <button onClick={handleLogout} className="flex items-center text-gray-300 hover:text-white">
+                    <LogOut className="w-4 h-4 mr-1" /> Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="-mr-2 flex md:hidden">
+            <button onClick={() => setIsOpen(!isOpen)} className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none">
+              {isOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
+            </button>
           </div>
         </div>
       </div>
+      
+      {/* Mobile Menu */}
+      {isOpen && (
+        <div className="md:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            <Link to="/" className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Home</Link>
+            <Link to="/schedule" className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Schedule</Link>
+            <Link to="/stats" className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Stats</Link>
+            <Link to="/players" className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Players</Link>
+            {user && (
+              <Link to={user.role === 'admin' ? "/admin" : "/dashboard"} className="text-orange-400 hover:text-orange-300 block px-3 py-2 rounded-md text-base font-medium">
+                {user.role === 'admin' ? "Admin Dashboard" : "My Dashboard"}
+              </Link>
+            )}
+            {!user ? (
+              <Link to="/login" className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Login</Link>
+            ) : (
+              <button onClick={handleLogout} className="text-gray-300 hover:text-white block w-full text-left px-3 py-2 rounded-md text-base font-medium">Logout</button>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

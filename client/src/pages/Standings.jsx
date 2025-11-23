@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { fetchStandings, fetchPlayers } from '../services/api';
-import { Trophy, Minus, TrendingUp, TrendingDown, Shield, User, Users, BarChart2 } from 'lucide-react';
+import { Minus, TrendingUp, TrendingDown, Users, BarChart2 } from 'lucide-react';
 
 const Standings = () => {
-  const [activeTab, setActiveTab] = useState('teams'); // 'teams' or 'players'
+  const [activeTab, setActiveTab] = useState('teams'); 
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Player Sorting State
   const [sortConfig, setSortConfig] = useState({ key: 'fantasyPoints', direction: 'desc' });
 
   useEffect(() => {
@@ -18,7 +16,6 @@ const Standings = () => {
         if (activeTab === 'teams') {
           const { data } = await fetchStandings();
           if (data.success) {
-            // Sort by win percentage, then total wins
             const sorted = data.data.sort((a, b) => {
               const wpA = (a.wins + a.losses) === 0 ? 0 : a.wins / (a.wins + a.losses);
               const wpB = (b.wins + b.losses) === 0 ? 0 : b.wins / (b.wins + b.losses);
@@ -30,7 +27,6 @@ const Standings = () => {
         } else {
           const { data } = await fetchPlayers();
           if (data.success) {
-            // Enrich players with Fantasy Points
             const enriched = data.data.map(p => ({
               ...p,
               fantasyPoints: (
@@ -54,7 +50,6 @@ const Standings = () => {
     loadData();
   }, [activeTab]);
 
-  // Sorting Logic for Players
   const handleSort = (key) => {
     let direction = 'desc';
     if (sortConfig.key === key && sortConfig.direction === 'desc') {
@@ -64,7 +59,6 @@ const Standings = () => {
   };
 
   const sortedPlayers = [...players].sort((a, b) => {
-    // Numeric sort
     const valA = parseFloat(a[sortConfig.key]) || 0;
     const valB = parseFloat(b[sortConfig.key]) || 0;
     if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -147,12 +141,17 @@ const Standings = () => {
                         <td className="px-6 py-4 text-center font-medium text-gray-900">{index + 1}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-indigo-800 font-bold border border-gray-200">
-                               {team.logoUrl && !team.logoUrl.includes('placeholder') ? (
-                                  <img className="h-8 w-8 rounded-full object-contain" src={team.logoUrl} alt="" onError={(e) => e.target.style.display='none'} />
-                               ) : (
-                                  team.name.substring(0, 2).toUpperCase()
-                               )}
+                            <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-indigo-800 font-bold border border-gray-200 overflow-hidden">
+                               {/* FIX: Fallback image handling */}
+                               <img 
+                                 className="h-10 w-10 object-cover" 
+                                 src={team.logoUrl || `https://ui-avatars.com/api/?name=${team.name}&background=random`}
+                                 alt={team.name}
+                                 onError={(e) => {
+                                   e.target.onerror = null;
+                                   e.target.src = `https://ui-avatars.com/api/?name=${team.name}&background=random`;
+                                 }} 
+                               />
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-bold text-gray-900">{team.name}</div>
@@ -186,8 +185,6 @@ const Standings = () => {
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-12">#</th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Player</th>
-                    
-                    {/* Sortable Stats Headers */}
                     {['ppg', 'rpg', 'apg', 'bpg', 'spg', 'turnovers', 'threeMade', 'ftMade', 'fantasyPoints'].map(key => (
                       <th 
                         key={key}
@@ -211,7 +208,16 @@ const Standings = () => {
                       <td className="px-4 py-3 text-center text-sm font-medium text-gray-500">{index + 1}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center">
-                          <img className="h-8 w-8 rounded-full object-cover border border-gray-200" src={player.imageUrl} alt="" />
+                          {/* FIX: Fallback image handling */}
+                          <img 
+                            className="h-8 w-8 rounded-full object-cover border border-gray-200" 
+                            src={player.imageUrl || `https://ui-avatars.com/api/?name=${player.name}&background=random`} 
+                            alt={player.name}
+                            onError={(e) => {
+                               e.target.onerror = null;
+                               e.target.src = `https://ui-avatars.com/api/?name=${player.name}&background=random`;
+                            }}
+                          />
                           <div className="ml-3">
                             <div className="text-sm font-bold text-gray-900">{player.name}</div>
                             <div className="text-xs text-gray-500">{player.team} • {player.position}</div>

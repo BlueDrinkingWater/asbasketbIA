@@ -71,6 +71,26 @@ app.use(errorHandler);
 // Socket.io Connection Event
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
+
+  // 1. Join a specific game room (Official or Spectator)
+  socket.on('join_game', (gameId) => {
+    socket.join(gameId);
+    console.log(`User joined game room: ${gameId}`);
+  });
+
+  // 2. Official sends Timer Update (Sync)
+  socket.on('timer_update', (data) => {
+    // data = { gameId, minutes, seconds, isRunning, shotClock }
+    // Broadcast to everyone in the room EXCEPT the sender (to prevent lag jitter for official)
+    socket.to(data.gameId).emit('receive_timer_update', data);
+  });
+
+  // 3. Official updates Score/Stats
+  socket.on('stat_update', (data) => {
+    // data = { gameId, homeScore, awayScore, lastAction }
+    io.in(data.gameId).emit('receive_stat_update', data);
+  });
+
   socket.on('disconnect', () => {
     console.log(`❌ Socket disconnected: ${socket.id}`);
   });
