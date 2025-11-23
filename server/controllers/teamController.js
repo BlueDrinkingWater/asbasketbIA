@@ -1,5 +1,4 @@
-import Team from '../models/Team.js';
-
+import Team from '../models/Teams.js';
 export const getStandings = async (req, res, next) => {
   try {
     const teams = await Team.find().sort({ wins: -1 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import Navbar from './components/NavBar'; // Changed from "../" to "./"
 import Players from './pages/Players';
 import Standings from './pages/Standings';
 import AddStats from './pages/AddStats';
