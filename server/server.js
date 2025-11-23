@@ -51,9 +51,10 @@ app.use(xss());
 app.use(morgan('dev'));
 
 // Rate Limiting
+// FIXED: Increased limit to 1000 to prevent 429 errors during development/testing
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000, 
   message: 'Too many requests from this IP'
 });
 app.use('/api', limiter);
@@ -96,12 +97,12 @@ mongoose.connect(process.env.MONGODB_URI)
           email: adminEmail,
           name: 'System Admin',
           contactNumber: '0000000000',
-          paymentProofUrl: 'https://via.placeholder.com/150'
+          // FIXED: Use a more reliable placeholder service
+          paymentProofUrl: 'https://ui-avatars.com/api/?name=System+Admin&background=random'
         });
       }
 
       // FORCE UPDATE credentials and permissions
-      // This triggers the pre-save hook in User.js to hash the password
       adminUser.password = adminPassword; 
       adminUser.role = 'admin';
       adminUser.subscriptionStatus = 'active';

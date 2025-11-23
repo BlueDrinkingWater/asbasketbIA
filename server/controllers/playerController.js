@@ -24,7 +24,12 @@ export const getPlayerById = async (req, res, next) => {
 // Create Player (Admin Only)
 export const createPlayer = async (req, res, next) => {
   try {
-    const { name, team, position, jerseyNumber, ppg, rpg, apg } = req.body;
+    // Destructure all stat fields including the new ones
+    const { 
+      name, team, position, jerseyNumber, 
+      ppg, rpg, apg, spg, bpg, 
+      turnovers, threeMade, ftMade 
+    } = req.body;
 
     // Check if image was uploaded
     let imageUrl = '';
@@ -43,6 +48,11 @@ export const createPlayer = async (req, res, next) => {
       ppg: ppg || 0,
       rpg: rpg || 0,
       apg: apg || 0,
+      spg: spg || 0,
+      bpg: bpg || 0,
+      turnovers: turnovers || 0,
+      threeMade: threeMade || 0,
+      ftMade: ftMade || 0,
       imageUrl
     });
 

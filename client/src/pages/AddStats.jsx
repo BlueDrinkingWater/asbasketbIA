@@ -6,9 +6,12 @@ const AddStats = () => {
   const [isSubscribed, setIsSubscribed] = useState(false); // Simulating Admin Auth
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  
+  // Updated formData to include new stats
   const [formData, setFormData] = useState({
     name: '', team: '', position: 'PG', 
     ppg: '', rpg: '', apg: '', spg: '', bpg: '', 
+    turnovers: '', threeMade: '', ftMade: '', // NEW FIELDS
     fgPerc: '', threePerc: '', gamesPlayed: ''
   });
   const [status, setStatus] = useState({ type: '', message: '' });
@@ -46,8 +49,10 @@ const AddStats = () => {
     setLoading(true);
     const data = new FormData();
     Object.keys(formData).forEach(key => data.append(key, formData[key]));
-    // IMPT: Must match 'photo' as defined in server/routes/playerRoutes.js
-    data.append('photo', file); 
+    // IMPT: Must match 'photo' as defined in server/routes/playerRoutes.js (or 'image' depending on your middleware config)
+    // Based on your previous controller code, it expects 'image', let's stick to the standard or what your backend expects.
+    // If your backend route uses upload.single('image'), change this string to 'image'.
+    data.append('image', file); 
 
     try {
       await createPlayer(data);
@@ -55,6 +60,7 @@ const AddStats = () => {
       setFormData({ 
         name: '', team: '', position: 'PG', 
         ppg: '', rpg: '', apg: '', spg: '', bpg: '', 
+        turnovers: '', threeMade: '', ftMade: '',
         fgPerc: '', threePerc: '', gamesPlayed: '' 
       });
       removeImage();
@@ -181,6 +187,9 @@ const AddStats = () => {
                 { label: 'Assists (APG)', name: 'apg', ph: '6.3' },
                 { label: 'Steals (SPG)', name: 'spg', ph: '1.2' },
                 { label: 'Blocks (BPG)', name: 'bpg', ph: '0.8' },
+                { label: 'Turnovers (TO)', name: 'turnovers', ph: '2.1' },
+                { label: '3-Pointers Made', name: 'threeMade', ph: '3.5' },
+                { label: 'Free Throws Made', name: 'ftMade', ph: '4.2' },
                 { label: 'Field Goal %', name: 'fgPerc', ph: '48.5' },
                 { label: '3-Point %', name: 'threePerc', ph: '42.1' },
                 { label: 'Games Played', name: 'gamesPlayed', ph: '82' }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Shield, LogOut, LayoutDashboard } from 'lucide-react'; // Added LayoutDashboard icon
+import { Trophy, Shield, LogOut, LayoutDashboard, BarChart2 } from 'lucide-react'; 
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -22,6 +22,9 @@ const Navbar = () => {
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
+            <Link to="/stats" className="hover:text-yellow-400 transition flex items-center gap-1">
+               <BarChart2 className="w-4 h-4" /> Stats
+            </Link>
             <Link to="/players" className="hover:text-yellow-400 transition">Players</Link>
             <Link to="/standings" className="hover:text-yellow-400 transition">Standings</Link>
             <Link to="/schedule" className="hover:text-yellow-400 transition">Schedule</Link>

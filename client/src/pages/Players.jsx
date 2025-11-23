@@ -18,8 +18,20 @@ const Players = () => {
       try {
         const { data } = await fetchPlayers();
         if (data.success) {
-          setPlayers(data.data);
-          setFilteredPlayers(data.data);
+          // Calculate Fantasy Points for sorting/display locally
+          const enrichedData = data.data.map(p => ({
+            ...p,
+            fantasyPoints: (
+              (p.ppg || 0) * 1 + 
+              (p.rpg || 0) * 1.2 + 
+              (p.apg || 0) * 1.5 + 
+              (p.bpg || 0) * 3 + 
+              (p.spg || 0) * 3 - 
+              (p.turnovers || 0) * 1
+            ).toFixed(1)
+          }));
+          setPlayers(enrichedData);
+          setFilteredPlayers(enrichedData);
         }
       } catch (error) {
         console.error('Error fetching players:', error);
@@ -36,16 +48,19 @@ const Players = () => {
       player.team.toLowerCase().includes(search.toLowerCase())
     );
 
-    // Sorting Logic to Determine Rank
-    result.sort((a, b) => b[sortBy] - a[sortBy]);
+    // Sorting Logic
+    result.sort((a, b) => {
+        const valA = parseFloat(a[sortBy]) || 0;
+        const valB = parseFloat(b[sortBy]) || 0;
+        return valB - valA;
+    });
 
     setFilteredPlayers(result);
   }, [search, players, sortBy]);
 
   // Helper to get rank index in the global list
   const getGlobalRank = (player) => {
-    // Sort entire list by active metric to find true rank
-    const sortedAll = [...players].sort((a,b) => b[sortBy] - a[sortBy]);
+    const sortedAll = [...players].sort((a,b) => (parseFloat(b[sortBy]) || 0) - (parseFloat(a[sortBy]) || 0));
     return sortedAll.findIndex(p => p._id === player._id) + 1;
   };
 
@@ -68,6 +83,8 @@ const Players = () => {
                <option value="ppg">Rank by Points (PPG)</option>
                <option value="rpg">Rank by Rebounds (RPG)</option>
                <option value="apg">Rank by Assists (APG)</option>
+               <option value="fantasyPoints">Rank by Fantasy Points</option>
+               <option value="threeMade">Rank by 3PM</option>
              </select>
              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
                 <Filter className="h-4 w-4" />
@@ -103,7 +120,7 @@ const Players = () => {
             >
                {/* Rank Badge */}
                <div className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full z-10 shadow-md">
-                 #{getGlobalRank(player)} in {sortBy.toUpperCase()}
+                 #{getGlobalRank(player)} in {sortBy === 'fantasyPoints' ? 'FP' : sortBy.toUpperCase().replace('MADE', '')}
                </div>
 
               <div className="aspect-w-16 aspect-h-12 bg-gray-50 relative overflow-hidden">
@@ -194,7 +211,8 @@ const Players = () => {
 
                  <div className="mt-8">
                     <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4 border-b pb-2">Season Statistics</h4>
-                    <div className="grid grid-cols-3 gap-4 mb-4">
+                    
+                    <div className="grid grid-cols-3 gap-3 mb-3">
                        <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
                           <span className="block text-2xl font-black text-gray-900">{selectedPlayer.ppg}</span>
                           <span className="text-xs text-gray-500 font-semibold uppercase">PTS</span>
@@ -208,20 +226,41 @@ const Players = () => {
                           <span className="text-xs text-gray-500 font-semibold uppercase">AST</span>
                        </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                       <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
-                          <span className="block text-xl font-bold text-gray-900">{selectedPlayer.spg}</span>
-                          <span className="text-xs text-gray-500 font-semibold uppercase">STL</span>
+
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
+                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.spg}</span>
+                          <span className="text-[10px] text-gray-500 font-semibold uppercase">STL</span>
                        </div>
-                       <div className="bg-gray-50 p-3 rounded-xl text-center border border-gray-100">
-                          <span className="block text-xl font-bold text-gray-900">{selectedPlayer.bpg}</span>
-                          <span className="text-xs text-gray-500 font-semibold uppercase">BLK</span>
+                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
+                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.bpg}</span>
+                          <span className="text-[10px] text-gray-500 font-semibold uppercase">BLK</span>
                        </div>
-                       <div className="bg-blue-50 p-3 rounded-xl text-center border border-blue-100">
-                          <span className="block text-xl font-bold text-blue-700">{selectedPlayer.gamesPlayed}</span>
-                          <span className="text-xs text-blue-600 font-semibold uppercase">Games</span>
+                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
+                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.turnovers || 0}</span>
+                          <span className="text-[10px] text-gray-500 font-semibold uppercase">TO</span>
+                       </div>
+                       <div className="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
+                          <span className="block text-lg font-bold text-gray-900">{selectedPlayer.gamesPlayed}</span>
+                          <span className="text-[10px] text-gray-500 font-semibold uppercase">GP</span>
                        </div>
                     </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                       <div className="bg-indigo-50 p-2 rounded-lg text-center border border-indigo-100">
+                          <span className="block text-lg font-bold text-indigo-900">{selectedPlayer.threeMade || 0}</span>
+                          <span className="text-[10px] text-indigo-600 font-semibold uppercase">3PM</span>
+                       </div>
+                       <div className="bg-indigo-50 p-2 rounded-lg text-center border border-indigo-100">
+                          <span className="block text-lg font-bold text-indigo-900">{selectedPlayer.ftMade || 0}</span>
+                          <span className="text-[10px] text-indigo-600 font-semibold uppercase">FTM</span>
+                       </div>
+                       <div className="bg-green-50 p-2 rounded-lg text-center border border-green-100">
+                          <span className="block text-lg font-bold text-green-700">{selectedPlayer.fantasyPoints}</span>
+                          <span className="text-[10px] text-green-600 font-semibold uppercase">FP</span>
+                       </div>
+                    </div>
+
                  </div>
               </div>
 

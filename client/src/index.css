@@ -3,7 +3,33 @@
 @tailwind utilities;
 
 body {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  @apply bg-gray-50 text-gray-900 antialiased;
+}
+
+/* Custom Scrollbar for Tables */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full hover:bg-gray-400;
+}
+
+/* Marquee Animation for Game Ticker */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
 }

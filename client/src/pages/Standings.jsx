@@ -1,38 +1,78 @@
 import React, { useEffect, useState } from 'react';
-import { fetchStandings } from '../services/api'; // Ensure this is exported in api.js (using fetchTeams)
-import { Trophy, Minus, TrendingUp, TrendingDown, Shield } from 'lucide-react';
+import { fetchStandings, fetchPlayers } from '../services/api';
+import { Trophy, Minus, TrendingUp, TrendingDown, Shield, User, Users, BarChart2 } from 'lucide-react';
 
 const Standings = () => {
+  const [activeTab, setActiveTab] = useState('teams'); // 'teams' or 'players'
   const [teams, setTeams] = useState([]);
+  const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Player Sorting State
+  const [sortConfig, setSortConfig] = useState({ key: 'fantasyPoints', direction: 'desc' });
 
   useEffect(() => {
-    const getTeams = async () => {
+    const loadData = async () => {
+      setLoading(true);
       try {
-        const { data } = await fetchStandings();
-        if (data.success) {
-          // Sort by win percentage, then total wins
-          const sorted = data.data.sort((a, b) => {
-            const wpA = (a.wins + a.losses) === 0 ? 0 : a.wins / (a.wins + a.losses);
-            const wpB = (b.wins + b.losses) === 0 ? 0 : b.wins / (b.wins + b.losses);
-            
-            if (wpB !== wpA) return wpB - wpA; // Higher % first
-            return b.wins - a.wins; // More wins second
-          });
-          setTeams(sorted);
+        if (activeTab === 'teams') {
+          const { data } = await fetchStandings();
+          if (data.success) {
+            // Sort by win percentage, then total wins
+            const sorted = data.data.sort((a, b) => {
+              const wpA = (a.wins + a.losses) === 0 ? 0 : a.wins / (a.wins + a.losses);
+              const wpB = (b.wins + b.losses) === 0 ? 0 : b.wins / (b.wins + b.losses);
+              if (wpB !== wpA) return wpB - wpA;
+              return b.wins - a.wins;
+            });
+            setTeams(sorted);
+          }
+        } else {
+          const { data } = await fetchPlayers();
+          if (data.success) {
+            // Enrich players with Fantasy Points
+            const enriched = data.data.map(p => ({
+              ...p,
+              fantasyPoints: (
+                (p.ppg || 0) * 1 + 
+                (p.rpg || 0) * 1.2 + 
+                (p.apg || 0) * 1.5 + 
+                (p.bpg || 0) * 3 + 
+                (p.spg || 0) * 3 - 
+                (p.turnovers || 0) * 1
+              ).toFixed(1)
+            }));
+            setPlayers(enriched);
+          }
         }
       } catch (error) {
-        console.error('Error fetching standings:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
-    getTeams();
-  }, []);
+    loadData();
+  }, [activeTab]);
 
-  // Helper to display streak (Placeholder logic based on win/loss comparison)
+  // Sorting Logic for Players
+  const handleSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedPlayers = [...players].sort((a, b) => {
+    // Numeric sort
+    const valA = parseFloat(a[sortConfig.key]) || 0;
+    const valB = parseFloat(b[sortConfig.key]) || 0;
+    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   const getStreak = (wins, losses) => {
-      // In a real app, this would come from the backend game history
       if (wins > losses) return <span className="text-green-600 font-bold flex items-center justify-center"><TrendingUp className="w-3 h-3 mr-1"/> W1</span>;
       if (losses > wins) return <span className="text-red-600 font-bold flex items-center justify-center"><TrendingDown className="w-3 h-3 mr-1"/> L1</span>;
       return <span className="text-gray-400 flex items-center justify-center"><Minus className="w-3 h-3" /></span>;
@@ -40,13 +80,39 @@ const Standings = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="text-center mb-10">
+      <div className="text-center mb-8">
         <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight sm:text-5xl">
-          League Standings
+          League Statistics
         </h1>
         <p className="mt-4 text-lg text-gray-500">
-          Official team rankings and conference leaders
+          Official rankings and statistical leaders
         </p>
+      </div>
+
+      {/* Toggle Tabs */}
+      <div className="flex justify-center mb-8">
+        <div className="bg-gray-100 p-1 rounded-lg flex space-x-1">
+          <button
+            onClick={() => setActiveTab('teams')}
+            className={`flex items-center px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'teams' 
+                ? 'bg-white text-indigo-600 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Users className="w-4 h-4 mr-2" /> Team Standings
+          </button>
+          <button
+            onClick={() => setActiveTab('players')}
+            className={`flex items-center px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'players' 
+                ? 'bg-white text-indigo-600 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <BarChart2 className="w-4 h-4 mr-2" /> Player Stats
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -56,71 +122,120 @@ const Standings = () => {
       ) : (
         <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-100">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-indigo-900 text-white">
-                <tr>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider w-16">Rank</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Team</th>
-                  <th scope="col" className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-20">W</th>
-                  <th scope="col" className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-20">L</th>
-                  <th scope="col" className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-24">PCT</th>
-                  <th scope="col" className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider hidden sm:table-cell w-32">Conf</th>
-                  <th scope="col" className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider hidden md:table-cell w-32">Streak</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {teams.map((team, index) => {
-                  const totalGames = team.wins + team.losses;
-                  const pct = totalGames === 0 ? ".000" : (team.wins / totalGames).toFixed(3).substring(1); // Remove leading zero
-                  
-                  return (
-                    <tr key={team._id} className="hover:bg-indigo-50/30 transition-colors duration-150">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-indigo-800 font-bold border border-gray-200 shadow-sm">
-                             {/* Logo Logic: Use image if available, else Initials */}
-                             {team.logoUrl && !team.logoUrl.includes('placeholder') ? (
-                                <img className="h-8 w-8 rounded-full object-contain" src={team.logoUrl} alt="" onError={(e) => e.target.style.display='none'} />
-                             ) : (
-                                team.name.substring(0, 2).toUpperCase()
-                             )}
+            
+            {/* TEAM TABLE */}
+            {activeTab === 'teams' && (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-indigo-900 text-white">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider w-16">Rank</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Team</th>
+                    <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-20">W</th>
+                    <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-20">L</th>
+                    <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider w-24">PCT</th>
+                    <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider hidden sm:table-cell w-32">Conf</th>
+                    <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider hidden md:table-cell w-32">Streak</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {teams.map((team, index) => {
+                    const totalGames = team.wins + team.losses;
+                    const pct = totalGames === 0 ? ".000" : (team.wins / totalGames).toFixed(3).substring(1);
+                    
+                    return (
+                      <tr key={team._id} className="hover:bg-indigo-50/30 transition-colors duration-150">
+                        <td className="px-6 py-4 text-center font-medium text-gray-900">{index + 1}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-indigo-800 font-bold border border-gray-200">
+                               {team.logoUrl && !team.logoUrl.includes('placeholder') ? (
+                                  <img className="h-8 w-8 rounded-full object-contain" src={team.logoUrl} alt="" onError={(e) => e.target.style.display='none'} />
+                               ) : (
+                                  team.name.substring(0, 2).toUpperCase()
+                               )}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-bold text-gray-900">{team.name}</div>
+                              <div className="text-xs text-gray-500 sm:hidden">{team.conference}</div>
+                            </div>
                           </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-bold text-gray-900">{team.name}</div>
-                            <div className="text-xs text-gray-500 sm:hidden">{team.conference}</div>
+                        </td>
+                        <td className="px-6 py-4 text-center font-bold text-gray-900">{team.wins}</td>
+                        <td className="px-6 py-4 text-center font-medium text-gray-500">{team.losses}</td>
+                        <td className="px-6 py-4 text-center font-mono font-bold text-indigo-600">{pct}</td>
+                        <td className="px-6 py-4 text-center hidden sm:table-cell">
+                          <span className={`px-2.5 py-0.5 inline-flex text-xs leading-4 font-bold rounded-full ${team.conference === 'East' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                            {team.conference}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center hidden md:table-cell">{getStreak(team.wins, team.losses)}</td>
+                      </tr>
+                    );
+                  })}
+                  {teams.length === 0 && (
+                     <tr><td colSpan="7" className="px-6 py-16 text-center text-gray-400">No teams registered yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+
+            {/* PLAYER TABLE */}
+            {activeTab === 'players' && (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-indigo-900 text-white">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-12">#</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Player</th>
+                    
+                    {/* Sortable Stats Headers */}
+                    {['ppg', 'rpg', 'apg', 'bpg', 'spg', 'turnovers', 'threeMade', 'ftMade', 'fantasyPoints'].map(key => (
+                      <th 
+                        key={key}
+                        onClick={() => handleSort(key)}
+                        className={`px-2 py-3 text-center text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-indigo-800 transition-colors ${sortConfig.key === key ? 'bg-indigo-800' : ''}`}
+                        title={`Sort by ${key.toUpperCase()}`}
+                      >
+                        <div className="flex items-center justify-center">
+                          {key === 'fantasyPoints' ? 'FP' : key === 'threeMade' ? '3PM' : key === 'ftMade' ? 'FTM' : key === 'turnovers' ? 'TO' : key.toUpperCase().replace('PG', '')}
+                          {sortConfig.key === key && (
+                            sortConfig.direction === 'desc' ? <TrendingDown className="w-3 h-3 ml-1"/> : <TrendingUp className="w-3 h-3 ml-1"/>
+                          )}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {sortedPlayers.map((player, index) => (
+                    <tr key={player._id} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="px-4 py-3 text-center text-sm font-medium text-gray-500">{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center">
+                          <img className="h-8 w-8 rounded-full object-cover border border-gray-200" src={player.imageUrl} alt="" />
+                          <div className="ml-3">
+                            <div className="text-sm font-bold text-gray-900">{player.name}</div>
+                            <div className="text-xs text-gray-500">{player.team} • {player.position}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-gray-900">{team.wins}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-500">{team.losses}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-mono font-bold text-indigo-600">{pct}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500 hidden sm:table-cell">
-                        <span className={`px-2.5 py-0.5 inline-flex text-xs leading-4 font-bold rounded-full ${team.conference === 'East' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                          {team.conference}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500 hidden md:table-cell">
-                        {getStreak(team.wins, team.losses)}
-                      </td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'ppg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.ppg}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'rpg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.rpg}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'apg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.apg}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'bpg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.bpg}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'spg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.spg}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'turnovers' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.turnovers}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'threeMade' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.threeMade}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'ftMade' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.ftMade}</td>
+                      <td className={`px-2 py-3 text-center text-sm font-bold ${sortConfig.key === 'fantasyPoints' ? 'text-green-600 bg-green-50' : 'text-green-600'}`}>{player.fantasyPoints}</td>
                     </tr>
-                  );
-                })}
-                
-                {/* Placeholder Row if Empty */}
-                {teams.length === 0 && (
-                   <tr>
-                      <td colSpan="7" className="px-6 py-16 text-center text-gray-400 bg-gray-50 rounded-b-lg">
-                        <Shield className="mx-auto h-10 w-10 text-gray-300 mb-3" />
-                        <p>No teams registered yet.</p>
-                        <p className="text-xs mt-1">Teams will appear here once approved by the admin.</p>
-                      </td>
-                   </tr>
-                )}
-              </tbody>
-            </table>
+                  ))}
+                  {sortedPlayers.length === 0 && (
+                     <tr><td colSpan="11" className="px-6 py-16 text-center text-gray-400">No players found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+
           </div>
         </div>
       )}
