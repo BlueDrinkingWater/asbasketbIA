@@ -37,11 +37,12 @@ export const getPlayers = async (req, res, next) => {
 
 export const createPlayer = async (req, res, next) => {
   try {
+    // Check if image file exists
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload an image' });
     }
 
-    // Create full URL for the image
+    // Construct full URL for the uploaded image
     const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
 
     const player = await Player.create({
@@ -49,14 +50,10 @@ export const createPlayer = async (req, res, next) => {
       imageUrl: imageUrl
     });
 
-    // --- SOCKET.IO: Emit Event ---
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('players_updated', { message: 'New player created' });
-    }
-    // -----------------------------
-
-    res.status(201).json({ success: true, data: player });
+    res.status(201).json({
+      success: true,
+      data: player
+    });
   } catch (error) {
     next(error);
   }

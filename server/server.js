@@ -7,16 +7,18 @@ import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
 import xss from 'xss-clean';
-import http from 'http'; // Required for Socket.io
-import { Server } from 'socket.io'; // Required for Socket.io
+import http from 'http'; 
+import { Server } from 'socket.io'; 
 
 // Routes
 import playerRoutes from './routes/playerRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
-// Ensure you created this file, otherwise comment it out to prevent crashes
 import authRoutes from './routes/authRoutes.js'; 
 import { errorHandler } from './middleware/errorHandler.js';
+
+// Import User model for Admin Seeding
+import User from './models/User.js';
 
 dotenv.config();
 
@@ -29,18 +31,16 @@ const server = http.createServer(app);
 // 2. Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Allow Vite client
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"], 
     methods: ["GET", "POST"],
     credentials: true
   }
 });
 
-// Make io available in routes via req.app.get('io')
 app.set('io', io);
 
 // Middleware
 app.use(helmet());
-// CORS: Allow your frontend to connect
 app.use(cors({
   origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
   credentials: true
@@ -79,13 +79,50 @@ io.on('connection', (socket) => {
 console.log('Attempting to connect to MongoDB...');
 
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log('✅ MongoDB Connected');
-    // Only start server if DB connects
+
+    // --- FORCE ADMIN RESET/CREATE ---
+    try {
+      const adminEmail = 'admin@gmail.com';
+      const adminPassword = 'admin123';
+      
+      // Try to find the user
+      let adminUser = await User.findOne({ email: adminEmail });
+      
+      if (!adminUser) {
+        // Create new instance if not found
+        adminUser = new User({
+          email: adminEmail,
+          name: 'System Admin',
+          contactNumber: '0000000000',
+          paymentProofUrl: 'https://via.placeholder.com/150'
+        });
+      }
+
+      // FORCE UPDATE credentials and permissions
+      // This triggers the pre-save hook in User.js to hash the password
+      adminUser.password = adminPassword; 
+      adminUser.role = 'admin';
+      adminUser.subscriptionStatus = 'active';
+      adminUser.subscriptionExpiresAt = new Date('2099-12-31');
+
+      await adminUser.save();
+
+      console.log('👑 -----------------------------------------');
+      console.log(`👑 ADMIN READY:     ${adminEmail}`);
+      console.log(`👑 PASSWORD RESET:  ${adminPassword}`);
+      console.log('👑 -----------------------------------------');
+
+    } catch (err) {
+      console.error('⚠️ Failed to seed admin user:', err.message);
+    }
+    // ------------------------------
+
     server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);
     console.error('Server will NOT start because database connection failed.');
-    process.exit(1); // Exit process so you know it failed
+    process.exit(1); 
   });

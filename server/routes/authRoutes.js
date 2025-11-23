@@ -1,10 +1,18 @@
 import express from 'express';
-import { register, login } from '../controllers/authController.js';
+import { register, login, getUsers, updateUserStatus } from '../controllers/authController.js';
+import { upload } from '../config/cloudinary.js'; // Import configured multer
+import { protect, admin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Ensure these functions exist in your authController, or comment these lines out temporarily
-router.post('/register', register);
+// Public Routes
 router.post('/login', login);
+
+// Register requires file upload handling ('proofOfPayment' matches frontend form data name)
+router.post('/register', upload.single('proofOfPayment'), register);
+
+// Admin Routes
+router.get('/users', protect, admin, getUsers);
+router.put('/status', protect, admin, updateUserStatus);
 
 export default router;
