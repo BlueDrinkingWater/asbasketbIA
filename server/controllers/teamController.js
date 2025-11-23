@@ -1,4 +1,5 @@
 import Team from '../models/Teams.js';
+
 export const getStandings = async (req, res, next) => {
   try {
     const teams = await Team.find().sort({ wins: -1 });
@@ -11,6 +12,14 @@ export const getStandings = async (req, res, next) => {
 export const createTeam = async (req, res, next) => {
   try {
     const team = await Team.create(req.body);
+
+    // --- SOCKET.IO: Emit Update ---
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('standings_updated', { message: 'New team created' });
+    }
+    // -----------------------------
+
     res.status(201).json({ success: true, data: team });
   } catch (error) {
     next(error);

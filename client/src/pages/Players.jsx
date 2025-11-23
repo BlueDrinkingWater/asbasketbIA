@@ -1,17 +1,29 @@
-import React, { useState } from 'react';
-import { Search, Filter, User, ChevronLeft, ChevronRight, Activity, AlertCircle } from 'lucide-react';
-import { useApi } from '../hooks/useApi';
+import React, { useState, useEffect } from 'react';
+import { Search, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+// FIX: Explicitly add .jsx extension to ensure resolution
+import { useApi } from '../hooks/useApi.jsx'; 
 import { fetchPlayers } from '../services/api';
+import io from 'socket.io-client';
 
 const Players = () => {
   const [filters, setFilters] = useState({ search: '', position: '', team: '' });
   const [page, setPage] = useState(1);
   
   const queryParams = { ...filters, page, limit: 12 };
+  // Ensure fetchPlayers is defined in services/api.js
   const { data: response, loading, error, refetch } = useApi(() => fetchPlayers(queryParams), [page, JSON.stringify(filters)]);
   
   const players = response?.data || [];
   const pagination = response?.pagination || { pages: 1 };
+
+  // Socket.io for real-time updates
+  useEffect(() => {
+    const socket = io('http://localhost:5000');
+    socket.on('players_updated', () => {
+      refetch();
+    });
+    return () => socket.disconnect();
+  }, [refetch]);
 
   const handleFilter = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -21,6 +33,7 @@ const Players = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        {/* Search and Filter Section */}
         <div className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
@@ -46,6 +59,7 @@ const Players = () => {
           </div>
         </div>
 
+        {/* Loading State */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
@@ -59,11 +73,16 @@ const Players = () => {
            </div>
         ) : (
           <>
+            {/* Players Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {players.map(player => (
                 <div key={player._id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
                   <div className="h-64 overflow-hidden bg-gray-100 relative">
-                    <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    {player.imageUrl ? (
+                      <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">No Image</div>
+                    )}
                     <div className="absolute top-2 right-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded">
                       {player.position}
                     </div>
@@ -90,6 +109,7 @@ const Players = () => {
               ))}
             </div>
 
+            {/* Pagination */}
             {pagination.pages > 1 && (
               <div className="flex justify-center mt-8 gap-2">
                 <button

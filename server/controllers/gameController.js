@@ -1,7 +1,6 @@
 import Game from '../models/Game.js';
 import Team from '../models/Teams.js';
 
-// Get Schedule
 export const getGames = async (req, res, next) => {
   try {
     const games = await Game.find()
@@ -14,7 +13,6 @@ export const getGames = async (req, res, next) => {
   }
 };
 
-// Create Game & Update Standings
 export const createGame = async (req, res, next) => {
   try {
     const { homeTeam, awayTeam, status, homeScore, awayScore } = req.body;
@@ -25,7 +23,7 @@ export const createGame = async (req, res, next) => {
 
     const game = await Game.create(req.body);
 
-    // AUTOMATIC STANDINGS UPDATE
+    // Handle Standings
     if (status === 'Final') {
       const hScore = parseInt(homeScore);
       const aScore = parseInt(awayScore);
@@ -38,6 +36,19 @@ export const createGame = async (req, res, next) => {
         await Team.findByIdAndUpdate(homeTeam, { $inc: { losses: 1 } });
       }
     }
+
+    // --- Socket.io Emit ---
+    // Get the io instance from app
+    const io = req.app.get('io');
+    
+    // Emit event to all connected clients
+    io.emit('game_updated', { message: 'New game added' });
+    
+    // If standings changed, emit that too
+    if (status === 'Final') {
+      io.emit('standings_updated', { message: 'Standings changed' });
+    }
+    // ----------------------
 
     res.status(201).json({ success: true, data: game });
   } catch (error) {

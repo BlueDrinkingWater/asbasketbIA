@@ -11,10 +11,16 @@ API.interceptors.request.use((req) => {
 });
 
 export const registerUser = (formData) => API.post('/auth/register', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' } // Important for file upload
+  headers: { 'Content-Type': 'multipart/form-data' }
 });
 export const loginUser = (data) => API.post('/auth/login', data);
+
+// --- Fixed: Added missing exports ---
+export const fetchPlayers = (params) => API.get('/players', { params });
+export const fetchStandings = () => API.get('/teams');
+// ------------------------------------
+
 export const fetchGames = () => API.get('/games');
-export const createGame = (data) => API.post('/games', data); // Admin only
+export const createGame = (data) => API.post('/games', data);
 
 export default API;

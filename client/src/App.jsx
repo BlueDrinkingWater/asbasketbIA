@@ -6,8 +6,8 @@ import Players from './pages/Players';
 import Standings from './pages/Standings';
 import Subscribe from './pages/Subscribe';
 import AdminDashboard from './pages/AdminDashboard';
-import Schedule from './pages/Schedule'; // Assume created based on structure
-import Login from './pages/Login'; // Assume created
+import Schedule from './pages/Schedule'; 
+import Login from './pages/Login'; // Matches the file created in step 1
 
 // Helper for protected routes
 const ProtectedRoute = ({ children, role }) => {
@@ -31,13 +31,6 @@ function App() {
         {/* Auth Routes */}
         <Route path="/subscribe" element={<Subscribe />} />
         <Route path="/login" element={<Login />} />
-
-        {/* Protected User Routes */}
-        <Route path="/pro-stats" element={
-          <ProtectedRoute>
-            <div className="p-8 text-center text-2xl">Exclusive Pro Stats Board</div>
-          </ProtectedRoute>
-        } />
 
         {/* Protected Admin Routes */}
         <Route path="/admin" element={

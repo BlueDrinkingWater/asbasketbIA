@@ -49,6 +49,13 @@ export const createPlayer = async (req, res, next) => {
       imageUrl: imageUrl
     });
 
+    // --- SOCKET.IO: Emit Event ---
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('players_updated', { message: 'New player created' });
+    }
+    // -----------------------------
+
     res.status(201).json({ success: true, data: player });
   } catch (error) {
     next(error);
