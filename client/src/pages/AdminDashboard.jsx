@@ -11,20 +11,20 @@ import {
   createPlayer,
   createGame,
   fetchTeams,
-  fetchGames // Added fetchGames import
+  fetchGames 
 } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
   Check, X, User, Users, Activity, Calendar, 
   Loader, Plus, Settings, Shield, Upload, Trophy, Trash2,
-  Monitor, AlertCircle
+  Monitor, AlertCircle, Ticket, Newspaper
 } from 'lucide-react';
 import GameTicker from '../components/GameTicker';
 
 const AdminDashboard = () => {
   const [data, setData] = useState(null);
   const [teamsList, setTeamsList] = useState([]); 
-  const [gamesList, setGamesList] = useState([]); // State for Live Ops
+  const [gamesList, setGamesList] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users'); 
 
@@ -136,12 +136,15 @@ const AdminDashboard = () => {
     </div>
   );
 
+  // Updated Tabs Configuration
   const tabs = [
     { id: 'users', label: 'Approvals', icon: User, count: (data?.pendingUsers?.length || 0) + (data?.teamRequests?.length || 0) },
     { id: 'stats', label: 'Stats/Games', icon: Activity, count: (data?.statRequests?.length || 0) + (data?.gameRequests?.length || 0) },
     { id: 'manage', label: 'League Data', icon: Settings },
     { id: 'tournament', label: 'Tournament', icon: Trophy },
-    { id: 'live', label: 'Live Operations', icon: Monitor }, // NEW TAB
+    { id: 'live', label: 'Live Ops', icon: Monitor },
+    { id: 'content', label: 'News & Media', icon: Newspaper }, // NEW
+    { id: 'tickets', label: 'Ticketing', icon: Ticket },       // NEW
   ];
 
   return (
@@ -149,10 +152,16 @@ const AdminDashboard = () => {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-6 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-black text-gray-900 flex items-center tracking-tight">
-            <Shield className="w-6 h-6 mr-2 text-orange-600" />
-            ADMIN <span className="text-orange-600 ml-1">PORTAL</span>
-          </h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-2xl font-black text-gray-900 flex items-center tracking-tight">
+                <Shield className="w-6 h-6 mr-2 text-orange-600" />
+                ADMIN <span className="text-orange-600 ml-1">PORTAL</span>
+            </h1>
+            {/* NEW: Direct Link to League Settings */}
+            <Link to="/admin/settings" className="text-xs font-bold text-gray-500 hover:text-orange-600 flex items-center bg-gray-100 px-3 py-1.5 rounded-full transition-colors">
+                <Settings className="w-3 h-3 mr-1" /> League Settings
+            </Link>
+          </div>
           <div className="text-xs font-medium text-gray-500">
             System Status: <span className="text-green-600 font-bold">ONLINE</span>
           </div>
@@ -190,7 +199,6 @@ const AdminDashboard = () => {
           {/* 1. APPROVALS (Users & Teams) */}
           {activeTab === 'users' && (
             <div className="p-8 grid lg:grid-cols-2 gap-8">
-              {/* User Subscriptions */}
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center pb-2 border-b">
                   <User className="w-5 h-5 mr-2 text-gray-400" /> Pending Subscriptions
@@ -220,7 +228,6 @@ const AdminDashboard = () => {
                 )}
               </div>
 
-              {/* Team Requests */}
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center pb-2 border-b">
                   <Users className="w-5 h-5 mr-2 text-gray-400" /> Team Applications
@@ -257,7 +264,6 @@ const AdminDashboard = () => {
           {activeTab === 'stats' && (
             <div className="p-8">
               <h3 className="text-lg font-bold text-gray-900 mb-6">Pending Validations</h3>
-              
               <div className="bg-white border rounded-lg overflow-hidden mb-8">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -268,7 +274,6 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {/* Stats Requests */}
                     {data?.statRequests.map((req) => (
                       <tr key={req.reqId}>
                         <td className="px-6 py-4"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">STAT</span></td>
@@ -282,8 +287,6 @@ const AdminDashboard = () => {
                         </td>
                       </tr>
                     ))}
-                    
-                    {/* Game Requests */}
                     {data?.gameRequests.map((req) => (
                       <tr key={req.reqId}>
                         <td className="px-6 py-4"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">GAME</span></td>
@@ -297,7 +300,6 @@ const AdminDashboard = () => {
                         </td>
                       </tr>
                     ))}
-
                     {data?.statRequests.length === 0 && data?.gameRequests.length === 0 && (
                       <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-500 text-sm">No pending validations found.</td></tr>
                     )}
@@ -361,11 +363,9 @@ const AdminDashboard = () => {
                   </form>
                 )}
                 
-                {/* Add Player Form (Fixed Safety Check) */}
                 {manageTab === 'addPlayer' && (
                   <form onSubmit={handleCreatePlayer} className="max-w-2xl">
                      <h3 className="text-xl font-bold text-gray-900 mb-6">Add New Player</h3>
-                     
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
                           <div>
@@ -482,10 +482,9 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* 5. LIVE OPERATIONS (Re-added) */}
+          {/* 5. LIVE OPERATIONS */}
           {activeTab === 'live' && (
             <div className="flex flex-col h-full">
-              {/* Embedded Ticker for Admin Monitoring */}
               <div className="bg-black p-2">
                 <div className="text-xs font-bold text-gray-500 mb-1 uppercase tracking-widest px-2">Live Feed Monitor</div>
                 <GameTicker />
@@ -511,16 +510,12 @@ const AdminDashboard = () => {
                   <div className="grid gap-6 lg:grid-cols-2">
                     {gamesList.map(g => (
                       <div key={g._id} className={`border rounded-xl overflow-hidden transition-all ${g.status === 'live' ? 'border-red-200 shadow-red-100 shadow-lg ring-1 ring-red-100' : 'border-gray-200'}`}>
-                        
-                        {/* Card Header */}
                         <div className={`px-6 py-4 flex justify-between items-center ${g.status === 'live' ? 'bg-red-50' : 'bg-gray-50'}`}>
                           <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded ${g.status === 'live' ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 text-gray-600'}`}>
                             {g.status}
                           </span>
                           <span className="text-xs font-medium text-gray-500">{new Date(g.date).toLocaleDateString()}</span>
                         </div>
-
-                        {/* Card Body */}
                         <div className="p-6 bg-white">
                           <div className="flex justify-between items-center mb-6">
                             <div className="text-center w-1/3">
@@ -533,18 +528,11 @@ const AdminDashboard = () => {
                               <div className="text-sm font-bold text-gray-600 truncate">{g.awayTeam?.name || 'Away'}</div>
                             </div>
                           </div>
-
                           <div className="grid grid-cols-2 gap-3">
-                            <Link 
-                              to={`/game/${g._id}/console`} 
-                              className="flex items-center justify-center px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition"
-                            >
+                            <Link to={`/game/${g._id}/console`} className="flex items-center justify-center px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition">
                               <Settings className="w-4 h-4 mr-2" /> Official Console
                             </Link>
-                            <Link 
-                              to={`/game/${g._id}`} 
-                              className="flex items-center justify-center px-4 py-2 border border-gray-200 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-50 transition"
-                            >
+                            <Link to={`/game/${g._id}`} className="flex items-center justify-center px-4 py-2 border border-gray-200 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-50 transition">
                               <Monitor className="w-4 h-4 mr-2" /> View Board
                             </Link>
                           </div>
@@ -554,6 +542,30 @@ const AdminDashboard = () => {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* 6. NEW: NEWS & CONTENT (Placeholder for missing module) */}
+          {activeTab === 'content' && (
+            <div className="p-8 flex flex-col items-center justify-center h-full text-center">
+                <Newspaper className="w-16 h-16 text-gray-300 mb-4" />
+                <h3 className="text-xl font-bold text-gray-900">News & Content Management</h3>
+                <p className="text-gray-500 mb-6 max-w-md">Manage league announcements, press releases, and media content appearing on the public news page.</p>
+                <Link to="/news" className="px-6 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition">
+                    View Live News Page
+                </Link>
+            </div>
+          )}
+
+          {/* 7. NEW: TICKETING (Placeholder for missing module) */}
+          {activeTab === 'tickets' && (
+            <div className="p-8 flex flex-col items-center justify-center h-full text-center">
+                <Ticket className="w-16 h-16 text-gray-300 mb-4" />
+                <h3 className="text-xl font-bold text-gray-900">Ticketing & Sales</h3>
+                <p className="text-gray-500 mb-6 max-w-md">Manage ticket inventory, view sales reports, and configure seating charts for league games.</p>
+                <Link to="/tickets" className="px-6 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition">
+                    Open Ticketing Portal
+                </Link>
             </div>
           )}
 

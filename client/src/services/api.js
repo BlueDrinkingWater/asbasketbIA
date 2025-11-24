@@ -28,7 +28,8 @@ export const updateGameRequest = (data) => API.put('/auth/admin/game-request', d
 
 // Teams
 export const fetchTeams = () => API.get('/teams');
-export const fetchStandings = () => API.get('/teams'); 
+// FIX: Changed endpoint to avoid duplication with fetchTeams
+export const fetchStandings = () => API.get('/standings'); 
 export const createTeam = (data) => API.post('/teams', data);
 
 // Players
@@ -37,7 +38,6 @@ export const fetchPlayers = (params) => API.get('/players', { params });
 export const createPlayer = (data) => API.post('/players', data, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });
-// Admin update player stats directly (if supported by backend, otherwise creates new)
 export const updatePlayer = (id, data) => API.put(`/players/${id}`, data); 
 
 // Games

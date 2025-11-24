@@ -1,9 +1,12 @@
 // client/src/pages/Subscriber/SubscriberDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../../services/api';
+import { submitStats, submitTeam, registerForGame, fetchGames } from '../../services/api';
 import toast from 'react-hot-toast';
-import { User, Users, Trophy, Activity, Plus, PlayCircle, Monitor, Calendar, BarChart3 } from 'lucide-react';
+import { 
+    User, Users, Activity, PlayCircle, Monitor, Calendar, Loader,
+    Ticket, BarChart2, FileText, ExternalLink
+} from 'lucide-react';
 import GameTicker from '../../components/GameTicker';
 
 const SubscriberDashboard = () => {
@@ -18,10 +21,10 @@ const SubscriberDashboard = () => {
   const [gameRegForm, setGameRegForm] = useState({ gameId: '', teamName: '', roster: [{ name: '', jerseyNumber: '', position: 'PG' }] });
 
   useEffect(() => {
-    const fetchGames = async () => {
+    const loadGames = async () => {
       try {
-        // Fetch all games
-        const { data } = await api.get('/games'); 
+        setLoading(true);
+        const { data } = await fetchGames(); 
         if(data.success) setGames(data.data);
       } catch (err) {
         console.error("Could not fetch games");
@@ -30,14 +33,14 @@ const SubscriberDashboard = () => {
         setLoading(false);
       }
     };
-    fetchGames();
+    loadGames();
   }, []);
 
   // Handlers
   const handleStatSubmit = async (e) => { 
     e.preventDefault(); 
     try { 
-        await api.post('/auth/submit-stats', { userId: userInfo._id, ...statForm }); 
+        await submitStats({ userId: userInfo._id, ...statForm }); 
         toast.success('Stats submitted for review!'); 
         setStatForm({ playerName: '', ppg: '', rpg: '', apg: '', spg: '', bpg: '' }); 
     } catch (error) { 
@@ -48,7 +51,7 @@ const SubscriberDashboard = () => {
   const handleTeamSubmit = async (e) => { 
     e.preventDefault(); 
     try { 
-        await api.post('/auth/submit-team', { userId: userInfo._id, ...teamForm }); 
+        await submitTeam({ userId: userInfo._id, ...teamForm }); 
         toast.success('Team application submitted!'); 
         setTeamForm({ teamName: '', conference: 'East', roster: [{ name: '', gender: 'Male', jerseyNumber: '', position: 'PG' }] });
     } catch (error) { 
@@ -60,7 +63,7 @@ const SubscriberDashboard = () => {
     e.preventDefault(); 
     if (!gameRegForm.gameId) return toast.error("Select game"); 
     try { 
-        await api.post('/auth/submit-game', { userId: userInfo._id, ...gameRegForm }); 
+        await registerForGame({ userId: userInfo._id, ...gameRegForm }); 
         toast.success('Game registration submitted!'); 
         setGameRegForm({ gameId: '', teamName: '', roster: [{ name: '', jerseyNumber: '', position: 'PG' }] }); 
     } catch (error) { 
@@ -68,13 +71,20 @@ const SubscriberDashboard = () => {
     } 
   };
 
-  // Tabs configuration for cleaner render
+  if (loading) return (
+    <div className="flex flex-col justify-center items-center h-screen text-gray-800">
+      <Loader className="animate-spin w-10 h-10 text-orange-600 mb-3" />
+      <p className="font-medium">Loading Dashboard...</p>
+    </div>
+  );
+
   const tabs = [
     { id: 'stats', label: 'Add Stats', icon: Activity },
     { id: 'team', label: 'Register Team', icon: Users },
     { id: 'game', label: 'Join Game', icon: Calendar },
     { id: 'official', label: 'Official Console', icon: PlayCircle },
     { id: 'live', label: 'Live & Scores', icon: Monitor },
+    { id: 'resources', label: 'Resources', icon: FileText }, // NEW
   ];
 
   return (
@@ -308,20 +318,17 @@ const SubscriberDashboard = () => {
                         <Monitor className="w-5 h-5 mr-2 text-gray-600" />
                         Watch Live Scoreboards
                     </h3>
-                    
                     {games.length === 0 ? (
                         <p className="text-gray-500">No games found.</p>
                     ) : (
                         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             {games.map(g => (
                                 <div key={g._id} className="group relative border border-gray-200 rounded-xl p-0 overflow-hidden hover:shadow-xl transition-all bg-white">
-                                    {/* Status Banner */}
                                     {g.status === 'live' && (
                                         <div className="bg-red-600 text-white text-center text-xs font-bold py-1 animate-pulse">
                                             LIVE NOW
                                         </div>
                                     )}
-                                    
                                     <div className="p-6 text-center">
                                         <div className="flex justify-center items-center space-x-4 mb-2">
                                             <div className="text-2xl font-bold text-gray-900">{g.homeScore}</div>
@@ -351,6 +358,35 @@ const SubscriberDashboard = () => {
                         </div>
                     )}
                 </div>
+            </div>
+        )}
+
+        {/* 6. NEW: LEAGUE RESOURCES (Access previously missing files) */}
+        {activeTab === 'resources' && (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <Link to="/tickets" className="block p-6 bg-gray-50 border border-gray-200 rounded-xl hover:shadow-md transition-all hover:border-orange-200 group">
+                    <Ticket className="w-8 h-8 text-orange-600 mb-4 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-gray-900 text-lg mb-2">Get Tickets</h3>
+                    <p className="text-sm text-gray-500">Purchase tickets for upcoming league games and finals.</p>
+                </Link>
+
+                <Link to="/standings" className="block p-6 bg-gray-50 border border-gray-200 rounded-xl hover:shadow-md transition-all hover:border-orange-200 group">
+                    <BarChart2 className="w-8 h-8 text-orange-600 mb-4 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-gray-900 text-lg mb-2">Team Standings</h3>
+                    <p className="text-sm text-gray-500">Check current league rankings and conference breakdown.</p>
+                </Link>
+
+                <Link to="/stats/leaders" className="block p-6 bg-gray-50 border border-gray-200 rounded-xl hover:shadow-md transition-all hover:border-orange-200 group">
+                    <Activity className="w-8 h-8 text-orange-600 mb-4 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-gray-900 text-lg mb-2">Stats Leaderboard</h3>
+                    <p className="text-sm text-gray-500">Top performers in points, rebounds, assists and more.</p>
+                </Link>
+
+                <Link to="/news" className="block p-6 bg-gray-50 border border-gray-200 rounded-xl hover:shadow-md transition-all hover:border-orange-200 group">
+                    <FileText className="w-8 h-8 text-orange-600 mb-4 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-gray-900 text-lg mb-2">League News</h3>
+                    <p className="text-sm text-gray-500">Latest updates, press releases, and game recaps.</p>
+                </Link>
             </div>
         )}
 

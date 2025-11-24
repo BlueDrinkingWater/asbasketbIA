@@ -22,16 +22,26 @@ const Schedule = () => {
     loadGames();
   }, []);
 
-  if (loading) return <div className="text-center py-10">Loading Schedule...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+    </div>
+  );
+  
   if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">League Schedule & Results</h1>
+        <div className="flex justify-between items-end mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">League Schedule & Results</h1>
+            <span className="text-sm font-bold text-gray-500 bg-white px-3 py-1 rounded-full border shadow-sm">{games.length} Games</span>
+        </div>
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {games.map((game) => (
+          {games
+            .filter(game => game.homeTeam && game.awayTeam) // FILTER BROKEN GAMES
+            .map((game) => (
             <Link 
               to={`/game/${game._id}`} 
               key={game._id} 

@@ -1,14 +1,23 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, LayoutDashboard, Calendar } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Menu, X, LogOut, LayoutDashboard } from 'lucide-react';
 
 const Navbar = () => {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('userInfo'));
+  const location = useLocation(); // Hook to detect route changes
+
+  // Re-check local storage whenever the route changes (e.g. post-login)
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem('userInfo'));
+    setUser(storedUser);
+  }, [location]);
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('userInfo');
+    setUser(null);
     navigate('/login');
   };
 
@@ -38,7 +47,6 @@ const Navbar = () => {
                 </Link>
               ) : (
                 <div className="flex items-center space-x-4">
-                  {/* DASHBOARD LINK ADDED HERE */}
                   <Link to={user.role === 'admin' ? "/admin" : "/dashboard"} className="flex items-center text-gray-300 hover:text-white">
                     <LayoutDashboard className="w-4 h-4 mr-1" />
                     {user.role === 'admin' ? "Admin" : "Dashboard"}
