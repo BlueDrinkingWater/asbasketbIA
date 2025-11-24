@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchGames } from '../services/api';
 
 const GameTicker = () => {
@@ -10,7 +11,12 @@ const GameTicker = () => {
       try {
         const { data } = await fetchGames();
         if (data.success) {
-          const sorted = data.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+          // Sort live first, then recent
+          const sorted = data.data.sort((a, b) => {
+             if (a.status === 'live') return -1;
+             if (b.status === 'live') return 1;
+             return new Date(b.date) - new Date(a.date);
+          });
           // Duplicate for infinite scroll effect
           setGames([...sorted, ...sorted]); 
         }
@@ -26,48 +32,51 @@ const GameTicker = () => {
   if (loading || games.length === 0) return null;
 
   return (
-    <div className="bg-gray-900 text-white border-b border-gray-800 h-12 overflow-hidden relative flex items-center z-40">
-      <div className="absolute left-0 top-0 bottom-0 bg-gray-900 z-10 px-3 flex items-center font-black text-yellow-500 text-xs tracking-widest border-r border-gray-800 shadow-lg">
-        SCORES
+    <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white border-b border-gray-700 h-10 overflow-hidden relative flex items-center z-40 shadow-sm">
+      <div className="absolute left-0 top-0 bottom-0 bg-orange-600 z-10 px-4 flex items-center font-black text-white text-[10px] uppercase tracking-widest shadow-md clip-path-slant">
+        LIVE UPDATE
       </div>
       
-      <div className="animate-marquee flex items-center space-x-8 pl-4">
+      <div className="animate-marquee flex items-center space-x-0 hover:pause">
         {games.map((game, idx) => (
-          <div key={`${game._id}-${idx}`} className="flex items-center space-x-4 flex-shrink-0 text-xs font-medium border-r border-gray-800 pr-8 last:border-0">
-            
+          <Link 
+            to={`/game/${game._id}`} 
+            key={`${game._id}-${idx}`} 
+            className="flex items-center space-x-4 flex-shrink-0 text-xs font-medium border-r border-gray-700 px-6 py-2.5 hover:bg-gray-700 transition-colors cursor-pointer group"
+          >
             {/* Game Status */}
-            <div className="w-16 text-gray-400 text-[10px] leading-tight">
+            <div className="w-14 text-[9px] font-bold leading-tight text-center">
               {game.status === 'live' ? (
-                <span className="text-red-500 font-bold flex items-center animate-pulse">
+                <span className="text-red-400 flex items-center justify-center animate-pulse bg-red-900/30 px-1 rounded">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-1"></span> LIVE
                 </span>
               ) : game.status === 'Final' ? (
-                <span className="font-bold text-gray-500">FINAL</span>
+                <span className="text-gray-400">FINAL</span>
               ) : (
-                <span className="flex items-center">
+                <span className="text-orange-300">
                   {new Date(game.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
               )}
             </div>
 
-            {/* Teams & Scores - FIXED: Safe access to team names */}
-            <div className="flex space-x-3 items-center">
+            {/* Teams & Scores */}
+            <div className="flex space-x-3 items-center group-hover:scale-105 transition-transform duration-200 origin-left">
               <div className="flex items-center space-x-2">
-                <span className={`font-bold uppercase ${game.homeScore > game.awayScore ? 'text-white' : 'text-gray-400'}`}>
-                  {game.homeTeam?.name || 'TBD'} 
+                <span className={`uppercase tracking-tight ${game.homeScore > game.awayScore ? 'text-white font-bold' : 'text-gray-400 font-medium'}`}>
+                  {game.homeTeam?.name || 'Home'} 
                 </span>
-                <span className="text-gray-500 text-[10px] bg-gray-800 px-1 rounded">vs</span>
-                <span className={`font-bold uppercase ${game.awayScore > game.homeScore ? 'text-white' : 'text-gray-400'}`}>
-                  {game.awayTeam?.name || 'TBD'}
+                <span className="text-gray-600 text-[10px]">vs</span>
+                <span className={`uppercase tracking-tight ${game.awayScore > game.homeScore ? 'text-white font-bold' : 'text-gray-400 font-medium'}`}>
+                  {game.awayTeam?.name || 'Away'}
                 </span>
               </div>
               {(game.status === 'Final' || game.status === 'live') && (
-                <div className="font-mono font-bold text-yellow-400">
+                <div className="font-mono font-bold text-yellow-400 bg-gray-800 px-1.5 rounded text-[10px]">
                   {game.homeScore} - {game.awayScore}
                 </div>
               )}
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

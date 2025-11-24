@@ -1,23 +1,24 @@
-// client/src/pages/Players.jsx
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { fetchPlayers } from '../services/api';
-import { Search, Filter, X, User } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
 
 const Players = () => {
+  const [searchParams] = useSearchParams();
+  // Initialize search from URL param if it exists
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  
   const [players, setPlayers] = useState([]);
   const [filteredPlayers, setFilteredPlayers] = useState([]);
-  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [sortBy, setSortBy] = useState('ppg');
 
-  // SAFE IMAGE LOADER
   const getPlayerImage = (player) => {
     if (player.imageUrl && !player.imageUrl.includes('placeholder')) {
       return player.imageUrl;
     }
-    // Generates an avatar with the player's initials
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=random&color=fff&size=200`;
   };
 
@@ -50,6 +51,8 @@ const Players = () => {
   }, []);
 
   useEffect(() => {
+    if (players.length === 0) return;
+
     let result = players.filter(player =>
       player.name.toLowerCase().includes(search.toLowerCase()) ||
       player.team.toLowerCase().includes(search.toLowerCase())
@@ -131,7 +134,6 @@ const Players = () => {
                     src={getPlayerImage(player)}
                     alt={player.name}
                     className="w-full h-56 object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                    // Prevent infinite loop if UI Avatars also fails
                     onError={(e) => { 
                       e.target.onerror = null; 
                       e.target.style.display = 'none';
@@ -173,6 +175,7 @@ const Players = () => {
         </div>
       )}
 
+      {/* Modal remains unchanged */}
       {selectedPlayer && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">

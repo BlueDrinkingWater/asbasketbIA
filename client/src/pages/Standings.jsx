@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchStandings, fetchPlayers } from '../services/api';
 import { Minus, TrendingUp, TrendingDown, Users, BarChart2 } from 'lucide-react';
 
@@ -137,12 +138,11 @@ const Standings = () => {
                     const pct = totalGames === 0 ? ".000" : (team.wins / totalGames).toFixed(3).substring(1);
                     
                     return (
-                      <tr key={team._id} className="hover:bg-indigo-50/30 transition-colors duration-150">
+                      <tr key={team._id} className="hover:bg-indigo-50/30 transition-colors duration-150 group">
                         <td className="px-6 py-4 text-center font-medium text-gray-900">{index + 1}</td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center">
+                          <Link to={`/players?search=${encodeURIComponent(team.name)}`} className="flex items-center group-hover:translate-x-1 transition-transform">
                             <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-indigo-800 font-bold border border-gray-200 overflow-hidden">
-                               {/* FIX: Fallback image handling */}
                                <img 
                                  className="h-10 w-10 object-cover" 
                                  src={team.logoUrl || `https://ui-avatars.com/api/?name=${team.name}&background=random`}
@@ -154,10 +154,10 @@ const Standings = () => {
                                />
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-bold text-gray-900">{team.name}</div>
+                              <div className="text-sm font-bold text-gray-900 group-hover:text-indigo-600">{team.name}</div>
                               <div className="text-xs text-gray-500 sm:hidden">{team.conference}</div>
                             </div>
-                          </div>
+                          </Link>
                         </td>
                         <td className="px-6 py-4 text-center font-bold text-gray-900">{team.wins}</td>
                         <td className="px-6 py-4 text-center font-medium text-gray-500">{team.losses}</td>
@@ -171,9 +171,6 @@ const Standings = () => {
                       </tr>
                     );
                   })}
-                  {teams.length === 0 && (
-                     <tr><td colSpan="7" className="px-6 py-16 text-center text-gray-400">No teams registered yet.</td></tr>
-                  )}
                 </tbody>
               </table>
             )}
@@ -190,7 +187,6 @@ const Standings = () => {
                         key={key}
                         onClick={() => handleSort(key)}
                         className={`px-2 py-3 text-center text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-indigo-800 transition-colors ${sortConfig.key === key ? 'bg-indigo-800' : ''}`}
-                        title={`Sort by ${key.toUpperCase()}`}
                       >
                         <div className="flex items-center justify-center">
                           {key === 'fantasyPoints' ? 'FP' : key === 'threeMade' ? '3PM' : key === 'ftMade' ? 'FTM' : key === 'turnovers' ? 'TO' : key.toUpperCase().replace('PG', '')}
@@ -204,44 +200,36 @@ const Standings = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {sortedPlayers.map((player, index) => (
-                    <tr key={player._id} className="hover:bg-indigo-50/30 transition-colors">
+                    <tr key={player._id} className="hover:bg-indigo-50/30 transition-colors group">
                       <td className="px-4 py-3 text-center text-sm font-medium text-gray-500">{index + 1}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center">
-                          {/* FIX: Fallback image handling */}
+                        <Link to={`/players?search=${encodeURIComponent(player.name)}`} className="flex items-center">
                           <img 
                             className="h-8 w-8 rounded-full object-cover border border-gray-200" 
                             src={player.imageUrl || `https://ui-avatars.com/api/?name=${player.name}&background=random`} 
                             alt={player.name}
-                            onError={(e) => {
-                               e.target.onerror = null;
-                               e.target.src = `https://ui-avatars.com/api/?name=${player.name}&background=random`;
-                            }}
+                            onError={(e) => {e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${player.name}`;}}
                           />
                           <div className="ml-3">
-                            <div className="text-sm font-bold text-gray-900">{player.name}</div>
+                            <div className="text-sm font-bold text-gray-900 group-hover:text-indigo-600">{player.name}</div>
                             <div className="text-xs text-gray-500">{player.team} • {player.position}</div>
                           </div>
-                        </div>
+                        </Link>
                       </td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'ppg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.ppg}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'rpg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.rpg}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'apg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.apg}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'bpg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.bpg}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'spg' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.spg}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'turnovers' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.turnovers}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'threeMade' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.threeMade}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-medium ${sortConfig.key === 'ftMade' ? 'text-indigo-700 font-bold bg-indigo-50' : 'text-gray-700'}`}>{player.ftMade}</td>
-                      <td className={`px-2 py-3 text-center text-sm font-bold ${sortConfig.key === 'fantasyPoints' ? 'text-green-600 bg-green-50' : 'text-green-600'}`}>{player.fantasyPoints}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.ppg}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.rpg}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.apg}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.bpg}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.spg}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.turnovers}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.threeMade}</td>
+                      <td className="px-2 py-3 text-center text-sm font-medium text-gray-700">{player.ftMade}</td>
+                      <td className="px-2 py-3 text-center text-sm font-bold text-green-600 bg-green-50">{player.fantasyPoints}</td>
                     </tr>
                   ))}
-                  {sortedPlayers.length === 0 && (
-                     <tr><td colSpan="11" className="px-6 py-16 text-center text-gray-400">No players found.</td></tr>
-                  )}
                 </tbody>
               </table>
             )}
-
           </div>
         </div>
       )}

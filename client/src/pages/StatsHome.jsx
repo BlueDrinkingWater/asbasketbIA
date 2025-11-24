@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchPlayers } from '../services/api';
-import { 
-  Trophy, Activity, Target, 
-  TrendingUp, Zap, Crown, Hand
-} from 'lucide-react';
+import { Trophy, Activity, Target, TrendingUp, Zap, Crown, Hand } from 'lucide-react';
 
 const StatsHome = () => {
   const [players, setPlayers] = useState([]);
@@ -14,7 +12,6 @@ const StatsHome = () => {
       try {
         const { data } = await fetchPlayers();
         if (data.success) {
-          // Enrich with Fantasy Points Calculation
           const enriched = data.data.map(p => ({
             ...p,
             fantasyPoints: parseFloat((
@@ -37,14 +34,12 @@ const StatsHome = () => {
     getPlayers();
   }, []);
 
-  // Helper to get top 5 for a specific category
   const getLeaders = (key) => {
     return [...players]
       .sort((a, b) => (b[key] || 0) - (a[key] || 0))
       .slice(0, 5);
   };
 
-  // Stat Category Config
   const categories = [
     { title: 'Scoring Leaders', key: 'ppg', label: 'PPG', icon: <Target className="w-5 h-5 text-blue-500"/>, color: 'bg-blue-50' },
     { title: 'Rebound Kings', key: 'rpg', label: 'RPG', icon: <Activity className="w-5 h-5 text-green-500"/>, color: 'bg-green-50' },
@@ -54,17 +49,10 @@ const StatsHome = () => {
     { title: 'Fantasy Stars', key: 'fantasyPoints', label: 'FP', icon: <Crown className="w-5 h-5 text-indigo-500"/>, color: 'bg-indigo-50' },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600"></div></div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      
       <div className="text-center mb-12">
         <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">League Leaders</h1>
         <p className="mt-2 text-lg text-gray-500">Top performers across all major statistical categories</p>
@@ -80,7 +68,7 @@ const StatsHome = () => {
             </div>
             <div className="divide-y divide-gray-50">
               {getLeaders(cat.key).map((player, idx) => (
-                <div key={player._id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <Link to={`/players?search=${encodeURIComponent(player.name)}`} key={player._id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors group">
                   <div className="flex items-center">
                     <span className={`w-6 text-sm font-bold ${idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-orange-400' : 'text-gray-300'}`}>
                       {idx + 1}
@@ -88,11 +76,11 @@ const StatsHome = () => {
                     <img 
                       src={player.imageUrl} 
                       alt="" 
-                      className="w-8 h-8 rounded-full object-cover border border-gray-100 mx-3"
+                      className="w-8 h-8 rounded-full object-cover border border-gray-100 mx-3 group-hover:scale-110 transition-transform"
                       onError={(e) => e.target.src = `https://ui-avatars.com/api/?name=${player.name}`}
                     />
                     <div>
-                      <p className="text-sm font-bold text-gray-900 leading-none">{player.name}</p>
+                      <p className="text-sm font-bold text-gray-900 leading-none group-hover:text-indigo-600 transition-colors">{player.name}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{player.team}</p>
                     </div>
                   </div>
@@ -100,7 +88,7 @@ const StatsHome = () => {
                     <span className="block text-lg font-bold text-gray-900">{player[cat.key]}</span>
                     <span className="text-[10px] text-gray-400 uppercase tracking-wider">{cat.label}</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -134,8 +122,8 @@ const StatsHome = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
-              {getLeaders('fantasyPoints').concat(getLeaders('fantasyPoints').length < 10 ? [] : []).slice(0, 10).map((player, index) => (
-                <tr key={player._id} className="hover:bg-gray-50 transition-colors">
+              {getLeaders('fantasyPoints').slice(0, 10).map((player, index) => (
+                <tr key={player._id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm 
                       ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 
@@ -145,15 +133,15 @@ const StatsHome = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                    <Link to={`/players?search=${encodeURIComponent(player.name)}`} className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
-                        <img className="h-10 w-10 rounded-full object-cover border border-gray-200" src={player.imageUrl} alt="" onError={(e) => e.target.src=`https://ui-avatars.com/api/?name=${player.name}`}/>
+                        <img className="h-10 w-10 rounded-full object-cover border border-gray-200 group-hover:scale-110 transition-transform" src={player.imageUrl} alt="" onError={(e) => e.target.src=`https://ui-avatars.com/api/?name=${player.name}`}/>
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-bold text-gray-900">{player.name}</div>
+                        <div className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{player.name}</div>
                         <div className="text-xs text-gray-500">{player.team} • {player.position}</div>
                       </div>
-                    </div>
+                    </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 font-medium">{player.ppg}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{player.rpg}</td>

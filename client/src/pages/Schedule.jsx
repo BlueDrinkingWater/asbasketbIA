@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchGames } from '../services/api';
-import { Calendar, MapPin, Trophy } from 'lucide-react';
+import { Calendar, MapPin } from 'lucide-react';
 
 const Schedule = () => {
   const [games, setGames] = useState([]);
@@ -31,10 +32,14 @@ const Schedule = () => {
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {games.map((game) => (
-            <div key={game._id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+            <Link 
+              to={`/game/${game._id}`} 
+              key={game._id} 
+              className="block bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+            >
               {/* Status Header */}
               <div className={`px-6 py-3 text-sm font-bold text-white flex justify-between items-center ${
-                game.status === 'Final' ? 'bg-gray-900' : 'bg-orange-600'
+                game.status === 'Final' ? 'bg-gray-900' : game.status === 'live' ? 'bg-red-600 animate-pulse' : 'bg-orange-600'
               }`}>
                 <span>{game.status.toUpperCase()}</span>
                 <div className="flex items-center gap-2">
@@ -44,24 +49,24 @@ const Schedule = () => {
               </div>
 
               {/* Matchup */}
-              <div className="p-6">
+              <div className="p-6 group-hover:bg-gray-50 transition-colors">
                 <div className="flex justify-between items-center mb-6">
                   {/* Home Team */}
                   <div className="text-center w-1/3">
-                    <div className="font-bold text-lg truncate">{game.homeTeam?.name}</div>
-                    {game.status === 'Final' && (
+                    <div className="font-bold text-lg truncate text-gray-900">{game.homeTeam?.name}</div>
+                    {(game.status === 'Final' || game.status === 'live') && (
                       <div className={`text-3xl font-bold mt-2 ${game.homeScore > game.awayScore ? 'text-green-600' : 'text-gray-600'}`}>
                         {game.homeScore}
                       </div>
                     )}
                   </div>
 
-                  <div className="text-gray-400 font-bold">VS</div>
+                  <div className="text-gray-400 font-bold text-xs uppercase tracking-widest">VS</div>
 
                   {/* Away Team */}
                   <div className="text-center w-1/3">
-                    <div className="font-bold text-lg truncate">{game.awayTeam?.name}</div>
-                    {game.status === 'Final' && (
+                    <div className="font-bold text-lg truncate text-gray-900">{game.awayTeam?.name}</div>
+                    {(game.status === 'Final' || game.status === 'live') && (
                       <div className={`text-3xl font-bold mt-2 ${game.awayScore > game.homeScore ? 'text-green-600' : 'text-gray-600'}`}>
                         {game.awayScore}
                       </div>
@@ -69,12 +74,12 @@ const Schedule = () => {
                   </div>
                 </div>
 
-                <div className="border-t pt-4 flex items-center gap-2 text-gray-500 text-sm">
+                <div className="border-t pt-4 flex items-center justify-center gap-2 text-gray-500 text-sm">
                   <MapPin className="w-4 h-4" />
                   {game.location}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
         
