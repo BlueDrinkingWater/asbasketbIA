@@ -10,11 +10,19 @@ import xss from 'xss-clean';
 import http from 'http'; 
 import { Server } from 'socket.io'; 
 
-// Routes
+// --- Core Routes ---
 import playerRoutes from './routes/playerRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import authRoutes from './routes/authRoutes.js'; 
+
+// --- NEW Modules (NBA Features) ---
+import newsRoutes from './routes/newsRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
+import tradeRoutes from './routes/tradeRoutes.js';
+import statsRoutes from './routes/statsRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+
 import { errorHandler } from './middleware/errorHandler.js';
 
 // Import User model for Admin Seeding
@@ -37,6 +45,7 @@ const io = new Server(server, {
   }
 });
 
+// Make io accessible in routes via req.app.get('io')
 app.set('io', io);
 
 // Middleware
@@ -50,8 +59,7 @@ app.use(mongoSanitize());
 app.use(xss());
 app.use(morgan('dev'));
 
-// Rate Limiting
-// FIXED: Increased limit to 1000 to prevent 429 errors during development/testing
+// Rate Limiting (Increased for development)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000, 
@@ -59,11 +67,18 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// API Routes
+// --- API Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/games', gameRoutes);
+
+// Register New Module Routes
+app.use('/api/news', newsRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/trades', tradeRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Global Error Handler
 app.use(errorHandler);
@@ -80,14 +95,12 @@ io.on('connection', (socket) => {
 
   // 2. Official sends Timer Update (Sync)
   socket.on('timer_update', (data) => {
-    // data = { gameId, minutes, seconds, isRunning, shotClock }
-    // Broadcast to everyone in the room EXCEPT the sender (to prevent lag jitter for official)
+    // Broadcast to everyone in the room EXCEPT the sender
     socket.to(data.gameId).emit('receive_timer_update', data);
   });
 
   // 3. Official updates Score/Stats
   socket.on('stat_update', (data) => {
-    // data = { gameId, homeScore, awayScore, lastAction }
     io.in(data.gameId).emit('receive_stat_update', data);
   });
 
@@ -96,14 +109,16 @@ io.on('connection', (socket) => {
   });
 });
 
-// 3. Database Connection & Server Startup
-console.log('Attempting to connect to MongoDB...');
-
-mongoose.connect(process.env.MONGODB_URI)
-  .then(async () => {
+// 3. Database Connection & Server Startup (Robust Version)
+const startServer = async () => {
+  try {
+    console.log('Attempting to connect to MongoDB...');
+    
+    // Connect to Database
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/asbasketbia');
     console.log('✅ MongoDB Connected');
 
-    // --- FORCE ADMIN RESET/CREATE ---
+    // --- FORCE ADMIN RESET/CREATE (Seeding) ---
     try {
       const adminEmail = 'admin@gmail.com';
       const adminPassword = 'admin123';
@@ -117,7 +132,6 @@ mongoose.connect(process.env.MONGODB_URI)
           email: adminEmail,
           name: 'System Admin',
           contactNumber: '0000000000',
-          // FIXED: Use a more reliable placeholder service
           paymentProofUrl: 'https://ui-avatars.com/api/?name=System+Admin&background=random'
         });
       }
@@ -136,14 +150,17 @@ mongoose.connect(process.env.MONGODB_URI)
       console.log('👑 -----------------------------------------');
 
     } catch (err) {
-      console.error('⚠️ Failed to seed admin user:', err.message);
+      console.error('⚠️ Failed to seed admin user (Non-critical):', err.message);
     }
     // ------------------------------
 
-    server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-  })
-  .catch((err) => {
+  } catch (err) {
     console.error('❌ MongoDB connection error:', err.message);
-    console.error('Server will NOT start because database connection failed.');
-    process.exit(1); 
-  });
+    console.log('⚠️  Server starting WITHOUT database. API calls will fail until DB is fixed.');
+  }
+
+  // Start listening
+  server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+};
+
+startServer();
