@@ -1,3 +1,4 @@
+// client/src/pages/AdminDashboard.jsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -11,18 +12,24 @@ import {
   createGame,
   fetchTeams,
   fetchGames,
+  // News & Content
   fetchNews,
   createNews,
   updateNews,
   deleteNews,
   fetchSettings,
-  updateSettings
+  updateSettings,
+  // Business Logic
+  fetchAllTickets,
+  fetchTrades,
+  processTrade
 } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
   Check, X, User, Users, Activity, Calendar, 
   Loader, Plus, Settings, Shield, Upload, Trophy, Trash2,
-  Monitor, AlertCircle, Ticket, Newspaper, Edit, Video
+  Monitor, AlertCircle, Ticket, Newspaper, Edit, Video,
+  ArrowLeftRight, DollarSign
 } from 'lucide-react';
 import GameTicker from '../components/GameTicker';
 
@@ -37,37 +44,42 @@ const AdminDashboard = () => {
   const [manageTab, setManageTab] = useState('addTeam'); 
   const [teamForm, setTeamForm] = useState({ name: '', conference: 'East', logoUrl: '' });
   const [gameForm, setGameForm] = useState({ homeTeam: '', awayTeam: '', date: '', location: '' });
-
-  // --- DYNAMIC TOURNAMENT STATE ---
-  const [tourneySettings, setTourneySettings] = useState({ roundName: 'Preliminary', date: '', location: '' });
-  const [matchups, setMatchups] = useState([{ id: 1, home: '', away: '' }]);
-
   const [playerForm, setPlayerForm] = useState({ 
     name: '', team: '', position: 'PG', jerseyNumber: '', 
     ppg: 0, rpg: 0, apg: 0, image: null 
   });
 
-  // --- CONTENT MANAGEMENT STATE ---
+  // Tournament State
+  const [tourneySettings, setTourneySettings] = useState({ roundName: 'Preliminary', date: '', location: '' });
+  const [matchups, setMatchups] = useState([{ id: 1, home: '', away: '' }]);
+
+  // Content Management State
   const [newsList, setNewsList] = useState([]);
-  // FIX: Initial state ensures no undefined inputs
   const [newsForm, setNewsForm] = useState({ id: null, title: '', summary: '', content: '', category: 'Announcement', imageUrl: '' });
   const [isEditingNews, setIsEditingNews] = useState(false);
   const [leagueSettings, setLeagueSettings] = useState({ liveStreamUrl: '' });
+
+  // Business & Transaction State
+  const [ticketData, setTicketData] = useState({ tickets: [], totalRevenue: 0, totalSold: 0 });
+  const [tradeList, setTradeList] = useState([]);
 
   // --- Data Loading ---
   const loadData = async () => {
     try {
       setLoading(true);
+      // Use allSettled or individual catches to prevent one failure from blocking everything
       const [adminRes, teamsRes, gamesRes] = await Promise.all([
-        fetchAdminData(),
-        fetchTeams(),
-        fetchGames()
+        fetchAdminData().catch(e => null),
+        fetchTeams().catch(e => null),
+        fetchGames().catch(e => null)
       ]);
       
-      if(adminRes.data.success) setData(adminRes.data.data);
-      if(teamsRes.data.success) setTeamsList(teamsRes.data.data || []);
-      if(gamesRes.data.success) setGamesList(gamesRes.data.data || []);
+      if(adminRes?.data?.success) setData(adminRes.data.data);
+      if(teamsRes?.data?.success) setTeamsList(teamsRes.data.data || []);
+      if(gamesRes?.data?.success) setGamesList(gamesRes.data.data || []);
       
+      if (!adminRes) toast.error("Could not connect to server.");
+
     } catch (error) {
       console.error(error);
       toast.error('Failed to sync dashboard data.');
@@ -78,11 +90,27 @@ const AdminDashboard = () => {
 
   const loadContentData = async () => {
     try {
-        const [newsRes, settingsRes] = await Promise.all([fetchNews(), fetchSettings()]);
-        if(newsRes.data.success) setNewsList(newsRes.data.data);
-        if(settingsRes.data.success) setLeagueSettings(settingsRes.data.data);
+        const [newsRes, settingsRes] = await Promise.all([
+            fetchNews().catch(e => null), 
+            fetchSettings().catch(e => null)
+        ]);
+        if(newsRes?.data?.success) setNewsList(newsRes.data.data);
+        if(settingsRes?.data?.success) setLeagueSettings(settingsRes.data.data);
     } catch (error) {
-        toast.error("Failed to load content data");
+        console.error("Content load error", error);
+    }
+  }
+
+  const loadBusinessData = async () => {
+    try {
+        const [ticketsRes, tradesRes] = await Promise.all([
+            fetchAllTickets().catch(e => null), 
+            fetchTrades().catch(e => null)
+        ]);
+        if(ticketsRes?.data?.success) setTicketData(ticketsRes.data.data);
+        if(tradesRes?.data?.success) setTradeList(tradesRes.data.data);
+    } catch (error) {
+        console.error("Business data error", error);
     }
   }
 
@@ -92,9 +120,10 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if(activeTab === 'content') loadContentData();
+    if(activeTab === 'tickets' || activeTab === 'trades') loadBusinessData();
   }, [activeTab]);
 
-  // --- Handlers ---
+  // --- Core Handlers ---
   const handleSubAction = async (userId, status) => {
     try { await updateSubscription({ userId, status }); toast.success(`User ${status === 'active' ? 'approved' : 'rejected'}`); loadData(); } catch (e) { toast.error('Action failed'); }
   };
@@ -143,7 +172,6 @@ const AdminDashboard = () => {
             await createNews(newsForm);
             toast.success("News published!");
         }
-        // Reset form safely
         setNewsForm({ id: null, title: '', summary: '', content: '', category: 'Announcement', imageUrl: '' });
         setIsEditingNews(false);
         loadContentData();
@@ -153,7 +181,6 @@ const AdminDashboard = () => {
   };
 
   const handleEditNews = (article) => {
-    // FIX: Ensure fallback to empty strings to prevent "uncontrolled input" warning
     setNewsForm({ 
       ...article, 
       id: article._id,
@@ -186,6 +213,17 @@ const AdminDashboard = () => {
       } catch (err) {
           toast.error("Failed to update settings");
       }
+  };
+
+  // --- Trade Handlers ---
+  const handleTradeAction = async (tradeId, action) => {
+    try {
+        await processTrade({ tradeId, action });
+        toast.success(`Trade ${action}`);
+        loadBusinessData();
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Action failed");
+    }
   };
 
   // Tournament Logic
@@ -227,6 +265,7 @@ const AdminDashboard = () => {
     { id: 'tournament', label: 'Tournament', icon: Trophy },
     { id: 'live', label: 'Live Ops', icon: Monitor },
     { id: 'content', label: 'News & Media', icon: Newspaper }, 
+    { id: 'trades', label: 'Transactions', icon: ArrowLeftRight, count: tradeList.filter(t => t.status === 'Pending').length },
     { id: 'tickets', label: 'Ticketing', icon: Ticket },       
   ];
 
@@ -245,7 +284,7 @@ const AdminDashboard = () => {
             </Link>
           </div>
           <div className="text-xs font-medium text-gray-500">
-            System Status: <span className="text-green-600 font-bold">ONLINE</span>
+            System Status: {data ? <span className="text-green-600 font-bold">ONLINE</span> : <span className="text-red-600 font-bold">OFFLINE</span>}
           </div>
         </div>
       </div>
@@ -285,7 +324,8 @@ const AdminDashboard = () => {
                 <h3 className="text-lg font-bold text-gray-900 flex items-center pb-2 border-b">
                   <User className="w-5 h-5 mr-2 text-gray-400" /> Pending Subscriptions
                 </h3>
-                {data?.pendingUsers?.length === 0 ? (
+                {/* FIX: Safe access to pendingUsers */}
+                {(!data?.pendingUsers || data.pendingUsers.length === 0) ? (
                   <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed">
                     <p className="text-sm text-gray-500">No pending subscriptions.</p>
                   </div>
@@ -314,7 +354,8 @@ const AdminDashboard = () => {
                 <h3 className="text-lg font-bold text-gray-900 flex items-center pb-2 border-b">
                   <Users className="w-5 h-5 mr-2 text-gray-400" /> Team Applications
                 </h3>
-                {data?.teamRequests?.length === 0 ? (
+                {/* FIX: Safe access to teamRequests */}
+                {(!data?.teamRequests || data.teamRequests.length === 0) ? (
                   <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed">
                     <p className="text-sm text-gray-500">No team applications.</p>
                   </div>
@@ -356,7 +397,7 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {data?.statRequests.map((req) => (
+                    {data?.statRequests?.map((req) => (
                       <tr key={req.reqId}>
                         <td className="px-6 py-4"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">STAT</span></td>
                         <td className="px-6 py-4 text-sm">
@@ -369,7 +410,7 @@ const AdminDashboard = () => {
                         </td>
                       </tr>
                     ))}
-                    {data?.gameRequests.map((req) => (
+                    {data?.gameRequests?.map((req) => (
                       <tr key={req.reqId}>
                         <td className="px-6 py-4"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">GAME</span></td>
                         <td className="px-6 py-4 text-sm">
@@ -382,7 +423,7 @@ const AdminDashboard = () => {
                         </td>
                       </tr>
                     ))}
-                    {data?.statRequests.length === 0 && data?.gameRequests.length === 0 && (
+                    {(!data?.statRequests?.length && !data?.gameRequests?.length) && (
                       <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-500 text-sm">No pending validations found.</td></tr>
                     )}
                   </tbody>
@@ -722,7 +763,6 @@ const AdminDashboard = () => {
                                     newsList.map(article => (
                                         <div key={article._id} className="p-4 hover:bg-gray-50 transition flex gap-4">
                                             <img 
-                                                // FIX: Changed placeholder to ui-avatars to prevent ERR_NAME_NOT_RESOLVED
                                                 src={article.imageUrl || 'https://ui-avatars.com/api/?name=News&background=random'} 
                                                 alt="" 
                                                 className="w-24 h-16 object-cover rounded-lg bg-gray-200"
@@ -762,15 +802,100 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* 7. NEW: TICKETING (Placeholder for missing module) */}
+          {/* 7. NEW: TRADES (TRANSACTIONS) */}
+          {activeTab === 'trades' && (
+            <div className="p-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-900">Transaction Wire</h3>
+                    <div className="text-sm text-gray-500">Pending: <span className="font-bold text-orange-600">{tradeList.filter(t => t.status === 'Pending').length}</span></div>
+                </div>
+                <div className="space-y-4">
+                    {tradeList.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 border-2 border-dashed rounded-xl">No transactions found.</div>
+                    ) : (
+                        tradeList.map(trade => (
+                            <div key={trade._id} className={`border rounded-xl p-6 bg-white ${trade.status === 'Pending' ? 'border-orange-200 shadow-sm' : 'opacity-60'}`}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${trade.status==='Pending'?'bg-orange-100 text-orange-800':trade.status==='Approved'?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}`}>{trade.status}</span>
+                                    <span className="text-xs text-gray-400">{new Date(trade.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1 text-center p-4 bg-gray-50 rounded-lg">
+                                        <div className="font-black text-lg">{trade.proposingTeam?.name}</div>
+                                        <div className="text-xs text-gray-500 uppercase mb-2">Receives</div>
+                                        {trade.assetsRequested.map(p => <div key={p._id} className="font-bold text-indigo-600">{p.name}</div>)}
+                                    </div>
+                                    <div className="px-6 text-gray-300"><ArrowLeftRight /></div>
+                                    <div className="flex-1 text-center p-4 bg-gray-50 rounded-lg">
+                                        <div className="font-black text-lg">{trade.receivingTeam?.name}</div>
+                                        <div className="text-xs text-gray-500 uppercase mb-2">Receives</div>
+                                        {trade.assetsOffered.map(p => <div key={p._id} className="font-bold text-indigo-600">{p.name}</div>)}
+                                    </div>
+                                </div>
+                                {trade.status === 'Pending' && (
+                                    <div className="mt-4 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                                        <button onClick={()=>handleTradeAction(trade._id, 'Approved')} className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700">Approve Trade</button>
+                                        <button onClick={()=>handleTradeAction(trade._id, 'Declined')} className="px-4 py-2 border border-red-200 text-red-600 text-sm font-bold rounded hover:bg-red-50">Veto</button>
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+          )}
+
+          {/* 8. NEW: TICKETING DASHBOARD */}
           {activeTab === 'tickets' && (
-            <div className="p-8 flex flex-col items-center justify-center h-full text-center">
-                <Ticket className="w-16 h-16 text-gray-300 mb-4" />
-                <h3 className="text-xl font-bold text-gray-900">Ticketing & Sales</h3>
-                <p className="text-gray-500 mb-6 max-w-md">Manage ticket inventory, view sales reports, and configure seating charts for league games.</p>
-                <Link to="/tickets" className="px-6 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition">
-                    Open Ticketing Portal
-                </Link>
+            <div className="p-8">
+                <div className="grid grid-cols-3 gap-6 mb-8">
+                    <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg">
+                        <div className="text-indigo-200 text-xs font-bold uppercase tracking-wider mb-1">Total Revenue</div>
+                        <div className="text-4xl font-black">${ticketData.totalRevenue.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                        <div className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Tickets Sold</div>
+                        <div className="text-4xl font-black text-gray-900">{ticketData.totalSold}</div>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex items-center justify-center">
+                         <div className="text-center">
+                             <Ticket className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                             <div className="text-sm font-bold text-gray-500">Box Office Active</div>
+                         </div>
+                    </div>
+                </div>
+
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Sales History</h3>
+                <div className="bg-white border rounded-xl overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Customer</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Game</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Seat</th>
+                                <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {ticketData.tickets.map(t => (
+                                <tr key={t._id}>
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-gray-900">{t.user?.name || 'Guest'}</div>
+                                        <div className="text-xs text-gray-500">{t.user?.email}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                        {t.game?.homeTeam?.name} vs {t.game?.awayTeam?.name}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm font-mono font-bold">{t.seatNumber}</td>
+                                    <td className="px-6 py-4 text-right font-bold text-green-600">${t.price}</td>
+                                </tr>
+                            ))}
+                            {ticketData.tickets.length === 0 && (
+                                <tr><td colSpan="4" className="px-6 py-8 text-center text-gray-500">No tickets sold yet.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
           )}
 

@@ -1,4 +1,3 @@
-// client/src/services/api.js
 import axios from 'axios';
 
 const API = axios.create({ baseURL: 'http://localhost:5000/api' });
@@ -34,6 +33,13 @@ export const fetchNews = () => API.get('/news');
 export const createNews = (data) => API.post('/news', data);
 export const updateNews = (id, data) => API.put(`/news/${id}`, data);
 export const deleteNews = (id) => API.delete(`/news/${id}`);
+
+// --- Tickets (NEW) ---
+export const fetchAllTickets = () => API.get('/tickets/all');
+
+// --- Trades (NEW) ---
+export const fetchTrades = () => API.get('/trades');
+export const processTrade = (data) => API.post('/trades/execute', data);
 
 // --- Public Data & Management ---
 export const fetchTeams = () => API.get('/teams');

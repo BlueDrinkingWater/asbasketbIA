@@ -1,27 +1,53 @@
 import React, { useState } from 'react';
-import { Lock, CheckCircle, AlertTriangle, Upload, Activity, User, X } from 'lucide-react';
+import { Lock, CheckCircle, AlertTriangle, Upload, Activity, User, X, Plus, Minus, Trophy } from 'lucide-react';
 import { createPlayer } from '../services/api';
 
 const AddStats = () => {
-  const [isSubscribed, setIsSubscribed] = useState(false); // Simulating Admin Auth
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [activeTab, setActiveTab] = useState('profile'); // profile, boxscore
   
-  // Updated formData to include new stats
   const [formData, setFormData] = useState({
-    name: '', team: '', position: 'PG', 
-    ppg: '', rpg: '', apg: '', spg: '', bpg: '', 
-    turnovers: '', threeMade: '', ftMade: '', // NEW FIELDS
-    fgPerc: '', threePerc: '', gamesPlayed: ''
+    // Profile
+    name: '', team: '', position: 'PG', jerseyNumber: '',
+    
+    // Totals / Stats
+    gamesPlayed: '0', minutes: '0',
+    
+    // Scoring
+    pts: '', ppg: '',
+    fgm: '', fga: '',
+    threePm: '', threePa: '',
+    ftm: '', fta: '',
+    
+    // Rebounding
+    oreb: '', dreb: '', reb: '', rpg: '',
+    
+    // Playmaking & Handling
+    ast: '', apg: '', tov: '',
+    
+    // Defense
+    stl: '', spg: '',
+    blk: '', bpg: '',
+    pf: ''
   });
+
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Basic validation for negative numbers
     if (e.target.type === 'number' && value < 0) return;
     setFormData({ ...formData, [name]: value });
+  };
+
+  // Helper for "Live" incrementing if manually adding
+  const adjustValue = (field, amount) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: Math.max(0, (parseInt(prev[field] || 0) + amount).toString())
+    }));
   };
 
   const handleFileChange = (e) => {
@@ -42,36 +68,28 @@ const AddStats = () => {
     setStatus({ type: '', message: '' });
     
     if (!file) {
-      setStatus({ type: 'error', message: 'Please upload a player photo to proceed.' });
+      setStatus({ type: 'error', message: 'Player photo is required.' });
       return;
     }
 
     setLoading(true);
     const data = new FormData();
     Object.keys(formData).forEach(key => data.append(key, formData[key]));
-    // IMPT: Must match 'photo' as defined in server/routes/playerRoutes.js (or 'image' depending on your middleware config)
-    // Based on your previous controller code, it expects 'image', let's stick to the standard or what your backend expects.
-    // If your backend route uses upload.single('image'), change this string to 'image'.
-    data.append('image', file); 
+    data.append('image', file);
 
     try {
       await createPlayer(data);
       setStatus({ type: 'success', message: 'Player stats published successfully!' });
-      setFormData({ 
-        name: '', team: '', position: 'PG', 
-        ppg: '', rpg: '', apg: '', spg: '', bpg: '', 
-        turnovers: '', threeMade: '', ftMade: '',
-        fgPerc: '', threePerc: '', gamesPlayed: '' 
-      });
+      setFormData(Object.keys(formData).reduce((acc, key) => ({...acc, [key]: ''}), {position: 'PG'}));
       removeImage();
+      window.scrollTo(0,0);
     } catch (err) {
-      setStatus({ type: 'error', message: err.response?.data?.message || 'Failed to save stats. Please check your input.' });
+      setStatus({ type: 'error', message: err.response?.data?.message || 'Failed to save stats.' });
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock Admin Access Check
   if (!isSubscribed) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -79,45 +97,54 @@ const AddStats = () => {
           <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <Lock className="w-8 h-8 text-orange-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Admin Access Required</h2>
-          <p className="text-gray-600 mb-8">Verify your credentials to update official league statistics.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Official Stat Entry</h2>
+          <p className="text-gray-600 mb-8">Restricted to league officials.</p>
           <button onClick={() => setIsSubscribed(true)} className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-lg">
-            Enter Dashboard
+            Enter Console
           </button>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-gray-900 px-8 py-6 border-b border-gray-800 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Activity className="text-orange-500" /> Player Statistics
-            </h2>
-            <p className="text-gray-400 text-sm mt-1">Create new player profile and assign season stats</p>
-          </div>
+  // Reusable Input Component
+  const StatInput = ({ label, name, placeholder, cols = 1 }) => (
+    <div className={`col-span-${cols} space-y-1`}>
+      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{label}</label>
+      <div className="relative flex items-center">
+        <input 
+          type="number" 
+          name={name} 
+          value={formData[name]} 
+          onChange={handleChange}
+          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none transition-all font-mono text-sm font-bold text-gray-800" 
+          placeholder={placeholder || "0"}
+        />
+        {/* Mini stepper for manual adjustment */}
+        <div className="absolute right-1 flex flex-col gap-[1px]">
+           <button type="button" onClick={() => adjustValue(name, 1)} className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded-t text-[8px]"><Plus className="w-2 h-2"/></button>
+           <button type="button" onClick={() => adjustValue(name, -1)} className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded-b text-[8px]"><Minus className="w-2 h-2"/></button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-8">
-          {status.message && (
-            <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 text-sm font-medium ${
-              status.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-            }`}>
-              {status.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-              {status.message}
-            </div>
-          )}
+      </div>
+    </div>
+  );
 
-          {/* TOP SECTION: Image & Core Info */}
-          <div className="flex flex-col md:flex-row gap-8 mb-8">
-            {/* Image Upload Area */}
-            <div className="w-full md:w-1/3 flex-shrink-0">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Player Photo <span className="text-red-500">*</span></label>
+  return (
+    <div className="min-h-screen bg-gray-100 py-8 px-4">
+      <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+        
+        {/* LEFT SIDEBAR: IMAGE & CORE INFO */}
+        <div className="w-full md:w-1/3 bg-gray-900 p-8 text-white flex flex-col">
+           <div className="flex items-center gap-2 mb-8">
+              <Activity className="text-orange-500 w-6 h-6" />
+              <span className="font-black tracking-tight text-xl">STAT<span className="text-orange-500">CONSOLE</span></span>
+           </div>
+
+           {/* Image Upload */}
+           <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase">Player Photo</label>
               <div className={`relative h-64 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${
-                previewUrl ? 'border-orange-500 bg-white' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                previewUrl ? 'border-orange-500 bg-gray-800' : 'border-gray-700 bg-gray-800/50 hover:bg-gray-800'
               }`}>
                 {previewUrl ? (
                   <>
@@ -128,100 +155,114 @@ const AddStats = () => {
                   </>
                 ) : (
                   <>
-                    <Upload className="w-10 h-10 text-gray-400 mb-3" />
-                    <span className="text-sm text-gray-500 font-medium">Click to Upload Photo</span>
-                    <span className="text-xs text-gray-400 mt-1">JPG, PNG up to 5MB</span>
+                    <Upload className="w-8 h-8 text-gray-500 mb-2" />
+                    <span className="text-xs text-gray-500">Click to Upload</span>
                   </>
                 )}
                 <input type="file" accept="image/*" onChange={handleFileChange} className={`absolute inset-0 w-full h-full opacity-0 cursor-pointer ${previewUrl ? 'hidden' : ''}`} />
               </div>
-            </div>
+           </div>
 
-            {/* Core Details */}
-            <div className="w-full md:w-2/3 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                    <input required name="name" value={formData.name} onChange={handleChange} className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="e.g. Stephen Curry" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Team Name</label>
-                  <input required name="team" value={formData.team} onChange={handleChange} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="e.g. Golden State Warriors" />
-                </div>
+           <div className="space-y-4 flex-1">
+              <div>
+                 <label className="text-xs text-gray-500 font-bold uppercase">Full Name</label>
+                 <input required name="name" value={formData.name} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-orange-500 outline-none" placeholder="Player Name" />
+              </div>
+              <div>
+                 <label className="text-xs text-gray-500 font-bold uppercase">Team</label>
+                 <input required name="team" value={formData.team} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-orange-500 outline-none" placeholder="Team Name" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                 <div>
+                    <label className="text-xs text-gray-500 font-bold uppercase">Position</label>
+                    <select name="position" value={formData.position} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-2 text-sm outline-none">
+                       {['PG','SG','SF','PF','C'].map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                 </div>
+                 <div>
+                    <label className="text-xs text-gray-500 font-bold uppercase">Jersey #</label>
+                    <input name="jerseyNumber" value={formData.jerseyNumber} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-orange-500 outline-none" placeholder="23" />
+                 </div>
+              </div>
+           </div>
+        </div>
+
+        {/* RIGHT CONTENT: STATS FORM */}
+        <form onSubmit={handleSubmit} className="w-full md:w-2/3 p-8 overflow-y-auto max-h-screen">
+           
+           <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Box Score Entry</h2>
+              <div className="flex gap-2">
+                 <button type="button" onClick={() => setActiveTab('profile')} className={`px-4 py-1 rounded-full text-xs font-bold ${activeTab === 'profile' ? 'bg-orange-100 text-orange-700' : 'text-gray-400'}`}>Overview</button>
+                 <button type="button" onClick={() => setActiveTab('boxscore')} className={`px-4 py-1 rounded-full text-xs font-bold ${activeTab === 'boxscore' ? 'bg-orange-100 text-orange-700' : 'text-gray-400'}`}>Detailed Stats</button>
+              </div>
+           </div>
+
+           {status.message && (
+            <div className={`mb-6 p-3 rounded text-sm font-bold flex items-center gap-2 ${status.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+               {status.type === 'success' ? <CheckCircle className="w-4 h-4"/> : <AlertTriangle className="w-4 h-4"/>}
+               {status.message}
+            </div>
+           )}
+
+           <div className="space-y-8">
+              {/* SCORING SECTION */}
+              <div>
+                 <h3 className="text-sm font-black text-gray-900 uppercase mb-3 border-l-4 border-orange-500 pl-2">Scoring</h3>
+                 <div className="grid grid-cols-4 gap-3">
+                    <StatInput label="PTS" name="pts" placeholder="Points" />
+                    <StatInput label="FGM" name="fgm" />
+                    <StatInput label="FGA" name="fga" />
+                    <div className="flex flex-col justify-end pb-2 text-xs font-mono text-gray-500">
+                       FG%: {formData.fga > 0 ? ((formData.fgm / formData.fga) * 100).toFixed(1) : 0}%
+                    </div>
+                    <StatInput label="3PM" name="threePm" />
+                    <StatInput label="3PA" name="threePa" />
+                    <StatInput label="FTM" name="ftm" />
+                    <StatInput label="FTA" name="fta" />
+                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Position</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {['PG', 'SG', 'SF', 'PF', 'C'].map((pos) => (
-                    <button
-                      type="button"
-                      key={pos}
-                      onClick={() => setFormData({...formData, position: pos})}
-                      className={`py-2 rounded-lg text-sm font-bold border ${
-                        formData.position === pos 
-                        ? 'bg-orange-600 text-white border-orange-600' 
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      {pos}
-                    </button>
-                  ))}
-                </div>
+              {/* REBOUNDING & PLAYMAKING */}
+              <div className="grid grid-cols-2 gap-8">
+                 <div>
+                    <h3 className="text-sm font-black text-gray-900 uppercase mb-3 border-l-4 border-blue-500 pl-2">Rebounding</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                       <StatInput label="OREB" name="oreb" />
+                       <StatInput label="DREB" name="dreb" />
+                       <StatInput label="TOT REB" name="reb" />
+                    </div>
+                 </div>
+                 <div>
+                    <h3 className="text-sm font-black text-gray-900 uppercase mb-3 border-l-4 border-green-500 pl-2">Playmaking</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                       <StatInput label="AST" name="ast" />
+                       <StatInput label="TOV" name="tov" />
+                       <StatInput label="MIN" name="minutes" />
+                    </div>
+                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* STATS GRID */}
-          <div className="border-t border-gray-100 pt-8">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-orange-600" /> Performance Data
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {[
-                { label: 'Points (PPG)', name: 'ppg', ph: '25.4' },
-                { label: 'Rebounds (RPG)', name: 'rpg', ph: '5.2' },
-                { label: 'Assists (APG)', name: 'apg', ph: '6.3' },
-                { label: 'Steals (SPG)', name: 'spg', ph: '1.2' },
-                { label: 'Blocks (BPG)', name: 'bpg', ph: '0.8' },
-                { label: 'Turnovers (TO)', name: 'turnovers', ph: '2.1' },
-                { label: '3-Pointers Made', name: 'threeMade', ph: '3.5' },
-                { label: 'Free Throws Made', name: 'ftMade', ph: '4.2' },
-                { label: 'Field Goal %', name: 'fgPerc', ph: '48.5' },
-                { label: '3-Point %', name: 'threePerc', ph: '42.1' },
-                { label: 'Games Played', name: 'gamesPlayed', ph: '82' }
-              ].map((field) => (
-                <div key={field.name} className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">{field.label}</label>
-                  <input 
-                    required 
-                    type="number" 
-                    step="0.1" 
-                    name={field.name} 
-                    value={formData[field.name]} 
-                    onChange={handleChange} 
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none transition-all font-mono text-gray-800" 
-                    placeholder={field.ph} 
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+              {/* DEFENSE */}
+              <div>
+                 <h3 className="text-sm font-black text-gray-900 uppercase mb-3 border-l-4 border-red-500 pl-2">Defense & Other</h3>
+                 <div className="grid grid-cols-4 gap-3">
+                    <StatInput label="STL" name="stl" />
+                    <StatInput label="BLK" name="blk" />
+                    <StatInput label="PF" name="pf" />
+                    <StatInput label="Games" name="gamesPlayed" />
+                 </div>
+              </div>
+           </div>
 
-          <div className="mt-10 pt-6 border-t border-gray-100">
-            <button 
+           <button 
               type="submit" 
               disabled={loading}
-              className={`w-full py-4 rounded-xl font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 ${
-                loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 text-white transform active:scale-[0.99]'
-              }`}
-            >
-              {loading ? 'Publishing...' : 'Publish Player & Stats'}
-            </button>
-          </div>
+              className="mt-8 w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition shadow-lg flex justify-center items-center gap-2"
+           >
+              {loading ? 'Saving...' : <><Trophy className="w-4 h-4"/> Publish Player Data</>}
+           </button>
+
         </form>
       </div>
     </div>

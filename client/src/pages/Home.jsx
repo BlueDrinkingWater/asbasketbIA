@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, Activity, Clock, Trophy, AlertTriangle, Calendar, PlayCircle, Newspaper } from 'lucide-react';
+import { ArrowRight, Activity, Clock, Trophy, AlertTriangle, Calendar, PlayCircle, Newspaper } from 'lucide-react';
 import { fetchGames, fetchPlayers, fetchTeams, fetchNews, fetchSettings } from '../services/api';
 
 const Home = () => {
@@ -15,7 +15,6 @@ const Home = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // FIX: Wrapped in individual try-catches silently if one fails to prevent full page crash
         const [gamesRes, playersRes, teamsRes, newsRes, settingsRes] = await Promise.all([
           fetchGames().catch(e => ({ data: { data: [] } })),
           fetchPlayers().catch(e => ({ data: { data: [] } })),
@@ -24,14 +23,16 @@ const Home = () => {
           fetchSettings().catch(e => ({ data: { data: {} } }))
         ]);
 
-        // 1. Filter out broken games
-        const validGames = (gamesRes.data.data || []).filter(g => g.homeTeam && g.awayTeam);
+        // 1. Filter out broken games (Ensure homeTeam and awayTeam objects exist)
+        const validGames = (gamesRes.data.data || []).filter(g => g && g.homeTeam && g.awayTeam);
 
         // 2. Process Featured Game (Priority: Live -> Upcoming -> Recent Final)
         const liveGame = validGames.find(g => g.status === 'live');
         
+        // Relaxed date filter: Check for 'scheduled' status (case-insensitive)
         const sortedUpcoming = validGames
-          .filter(g => g.status === 'scheduled' && new Date(g.date) > new Date())
+          .filter(g => g.status && g.status.toLowerCase() === 'scheduled')
+          .filter(g => new Date(g.date) > new Date(Date.now() - 2 * 60 * 60 * 1000)) // Show games from last 2 hours just in case
           .sort((a, b) => new Date(a.date) - new Date(b.date));
         
         const nextGame = sortedUpcoming[0];
@@ -40,11 +41,14 @@ const Home = () => {
           .filter(g => g.status === 'Final')
           .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
         
-        setFeaturedGame(liveGame || nextGame || lastGame);
+        const primeGame = liveGame || nextGame || lastGame;
+        setFeaturedGame(primeGame);
 
         // 3. Set Upcoming Schedule
-        const featuredId = (liveGame || nextGame || lastGame)?._id;
-        setUpcomingSchedule(sortedUpcoming.filter(g => g._id !== featuredId).slice(0, 4));
+        // If we are showing the 'nextGame' as featured, don't duplicate it in the list
+        const featuredId = primeGame?._id;
+        const scheduleList = sortedUpcoming.filter(g => g._id !== featuredId).slice(0, 5);
+        setUpcomingSchedule(scheduleList);
 
         // 4. Process MVP Race
         setMvpCandidates((playersRes.data.data || []).slice(0, 3));
@@ -187,7 +191,7 @@ const Home = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* 1. LATEST NEWS (NEW SECTION) */}
+          {/* 1. LATEST NEWS */}
           <div className="lg:col-span-2">
              <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center">
@@ -200,7 +204,6 @@ const Home = () => {
                     newsList.map(article => (
                         <div key={article._id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition cursor-pointer group">
                             <div className="h-48 overflow-hidden">
-                                {/* FIX: Replaced via.placeholder.com with ui-avatars.com */}
                                 <img 
                                   src={article.imageUrl || 'https://ui-avatars.com/api/?name=News&background=random&size=800'} 
                                   alt="" 
@@ -256,7 +259,7 @@ const Home = () => {
                     </Link>
                     ))
                 ) : (
-                    <div className="p-6 text-center text-gray-500 text-sm">No upcoming games.</div>
+                    <div className="p-6 text-center text-gray-500 text-sm">No additional upcoming games.</div>
                 )}
                 </div>
             </div>

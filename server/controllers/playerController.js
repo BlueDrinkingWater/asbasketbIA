@@ -3,7 +3,7 @@ import Player from '../models/Player.js';
 // Get all players
 export const getPlayers = async (req, res, next) => {
   try {
-    const players = await Player.find().sort({ ppg: -1 }); // Default sort by points
+    const players = await Player.find().sort({ ppg: -1 }); 
     res.json({ success: true, data: players });
   } catch (error) {
     next(error);
@@ -24,35 +24,55 @@ export const getPlayerById = async (req, res, next) => {
 // Create Player (Admin Only)
 export const createPlayer = async (req, res, next) => {
   try {
-    // Destructure all stat fields including the new ones
-    const { 
-      name, team, position, jerseyNumber, 
-      ppg, rpg, apg, spg, bpg, 
-      turnovers, threeMade, ftMade 
-    } = req.body;
+    const body = req.body;
 
-    // Check if image was uploaded
+    // Map image if exists
     let imageUrl = '';
     if (req.file && req.file.path) {
       imageUrl = req.file.path;
     } else {
-      // Fallback placeholder if no image provided
-      imageUrl = `https://ui-avatars.com/api/?name=${name}&background=random`;
+      imageUrl = `https://ui-avatars.com/api/?name=${body.name}&background=random`;
     }
 
+    // Construct player object with all extended stats
     const newPlayer = await Player.create({
-      name,
-      team,
-      position,
-      jerseyNumber,
-      ppg: ppg || 0,
-      rpg: rpg || 0,
-      apg: apg || 0,
-      spg: spg || 0,
-      bpg: bpg || 0,
-      turnovers: turnovers || 0,
-      threeMade: threeMade || 0,
-      ftMade: ftMade || 0,
+      ...body,
+      
+      // Map Legacy/Duplicate Inputs if necessary (or rely on frontend to send correct keys)
+      // Use defaults for numbers to prevent NaN
+      ppg: Number(body.ppg) || 0,
+      pts: Number(body.pts) || 0,
+      
+      fgm: Number(body.fgm) || 0,
+      fga: Number(body.fga) || 0,
+      
+      threePm: Number(body.threePm) || Number(body.threeMade) || 0,
+      threePa: Number(body.threePa) || 0,
+      
+      ftm: Number(body.ftm) || Number(body.ftMade) || 0,
+      fta: Number(body.fta) || 0,
+      
+      reb: Number(body.reb) || 0,
+      oreb: Number(body.oreb) || 0,
+      dreb: Number(body.dreb) || 0,
+      rpg: Number(body.rpg) || 0,
+      
+      ast: Number(body.ast) || 0,
+      apg: Number(body.apg) || 0,
+      
+      stl: Number(body.stl) || 0,
+      spg: Number(body.spg) || 0,
+      
+      blk: Number(body.blk) || 0,
+      bpg: Number(body.bpg) || 0,
+      
+      tov: Number(body.tov) || Number(body.turnovers) || 0,
+      turnovers: Number(body.tov) || Number(body.turnovers) || 0, // Keep synced
+      
+      pf: Number(body.pf) || 0,
+      minutes: Number(body.minutes) || 0,
+      
+      gamesPlayed: Number(body.gamesPlayed) || 0,
       imageUrl
     });
 

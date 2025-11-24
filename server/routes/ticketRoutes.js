@@ -1,11 +1,11 @@
 import express from 'express';
-import { buyTicket, getUserTickets } from '../controllers/ticketController.js';
-import { protect } from '../middleware/auth.js'; // Ensure users are logged in
+import { buyTicket, getUserTickets, getAllTickets } from '../controllers/ticketController.js';
+import { protect, admin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Protect these routes so only logged-in users can buy/view tickets
 router.post('/buy', protect, buyTicket);
-router.get('/', protect, getUserTickets);
+router.get('/my-tickets', protect, getUserTickets);
+router.get('/all', protect, admin, getAllTickets); // NEW
 
 export default router;
