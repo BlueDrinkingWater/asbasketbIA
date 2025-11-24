@@ -1,26 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, Activity, Clock, Trophy, AlertTriangle, Calendar } from 'lucide-react';
-import { fetchGames, fetchPlayers, fetchTeams } from '../services/api';
+import { ArrowRight, Star, Activity, Clock, Trophy, AlertTriangle, Calendar, PlayCircle, Newspaper } from 'lucide-react';
+import { fetchGames, fetchPlayers, fetchTeams, fetchNews, fetchSettings } from '../services/api';
 
 const Home = () => {
   const [featuredGame, setFeaturedGame] = useState(null);
-  const [upcomingSchedule, setUpcomingSchedule] = useState([]); // NEW STATE
+  const [upcomingSchedule, setUpcomingSchedule] = useState([]); 
   const [mvpCandidates, setMvpCandidates] = useState([]);
   const [standings, setStandings] = useState([]);
+  const [newsList, setNewsList] = useState([]);
+  const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [gamesRes, playersRes, teamsRes] = await Promise.all([
-          fetchGames(),
-          fetchPlayers(),
-          fetchTeams()
+        // FIX: Wrapped in individual try-catches silently if one fails to prevent full page crash
+        const [gamesRes, playersRes, teamsRes, newsRes, settingsRes] = await Promise.all([
+          fetchGames().catch(e => ({ data: { data: [] } })),
+          fetchPlayers().catch(e => ({ data: { data: [] } })),
+          fetchTeams().catch(e => ({ data: { data: [] } })),
+          fetchNews().catch(e => ({ data: { data: [] } })),
+          fetchSettings().catch(e => ({ data: { data: {} } }))
         ]);
 
         // 1. Filter out broken games
-        const validGames = gamesRes.data.data.filter(g => g.homeTeam && g.awayTeam);
+        const validGames = (gamesRes.data.data || []).filter(g => g.homeTeam && g.awayTeam);
 
         // 2. Process Featured Game (Priority: Live -> Upcoming -> Recent Final)
         const liveGame = validGames.find(g => g.status === 'live');
@@ -37,16 +42,19 @@ const Home = () => {
         
         setFeaturedGame(liveGame || nextGame || lastGame);
 
-        // 3. NEW: Set Upcoming Schedule (Next 4 games excluding featured if it's upcoming)
-        // We filter out the featured game so it doesn't appear twice
+        // 3. Set Upcoming Schedule
         const featuredId = (liveGame || nextGame || lastGame)?._id;
         setUpcomingSchedule(sortedUpcoming.filter(g => g._id !== featuredId).slice(0, 4));
 
         // 4. Process MVP Race
-        setMvpCandidates(playersRes.data.data.slice(0, 3));
+        setMvpCandidates((playersRes.data.data || []).slice(0, 3));
 
         // 5. Process Standings
-        setStandings(teamsRes.data.data.slice(0, 5));
+        setStandings((teamsRes.data.data || []).slice(0, 5));
+
+        // 6. News & Settings
+        setNewsList((newsRes.data.data || []).slice(0, 3)); 
+        setSettings(settingsRes.data.data || {});
 
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -83,7 +91,7 @@ const Home = () => {
           {/* Text Content */}
           <div className="md:w-1/2 text-white space-y-6 py-12 md:py-0">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold tracking-widest border border-orange-500/30 uppercase">
-              <Activity className="w-3 h-3 mr-2" /> Season 2024-25
+              <Activity className="w-3 h-3 mr-2" /> {settings.seasonName || 'Season 2024-25'}
             </span>
             <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-none">
               RISE TO <br/>
@@ -93,9 +101,17 @@ const Home = () => {
               The official hub for the AsBasketBIA league. Real-time scores, advanced player analytics, and league standings.
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
-              <Link to="/stats" className="px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition shadow-lg shadow-orange-900/20 flex items-center">
-                Player Stats <ArrowRight className="ml-2 w-5 h-5" />
-              </Link>
+              {/* LIVE LINK BUTTON */}
+              {settings.liveStreamUrl ? (
+                  <a href={settings.liveStreamUrl} target="_blank" rel="noopener noreferrer" className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition shadow-lg shadow-red-900/20 flex items-center animate-pulse">
+                    <PlayCircle className="ml-2 w-5 h-5 mr-2" /> WATCH LIVE
+                  </a>
+              ) : (
+                  <Link to="/stats" className="px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition shadow-lg shadow-orange-900/20 flex items-center">
+                    Player Stats <ArrowRight className="ml-2 w-5 h-5" />
+                  </Link>
+              )}
+              
               <Link to="/schedule" className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl font-bold transition flex items-center backdrop-blur-sm">
                 Full Schedule
               </Link>
@@ -171,118 +187,113 @@ const Home = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* 1. UPCOMING SCHEDULE (New Section) */}
-          <div className="lg:col-span-1">
-            <div className="flex justify-between items-center mb-6">
+          {/* 1. LATEST NEWS (NEW SECTION) */}
+          <div className="lg:col-span-2">
+             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                <Calendar className="w-6 h-6 text-orange-600 mr-2"/> Upcoming
+                <Newspaper className="w-6 h-6 text-indigo-600 mr-2"/> Latest News
               </h2>
-              <Link to="/schedule" className="text-indigo-600 text-sm font-bold hover:underline">View Schedule</Link>
+              <Link to="/news" className="text-indigo-600 text-sm font-bold hover:underline">View All News</Link>
             </div>
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              {upcomingSchedule.length > 0 ? (
-                upcomingSchedule.map((game) => (
-                  <Link to={`/game/${game._id}`} key={game._id} className="block p-4 border-b border-gray-50 hover:bg-gray-50 transition">
-                    <div className="text-xs text-gray-400 mb-2 flex items-center">
-                      <Clock className="w-3 h-3 mr-1"/> {new Date(game.date).toLocaleDateString()} @ {new Date(game.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {newsList.length > 0 ? (
+                    newsList.map(article => (
+                        <div key={article._id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition cursor-pointer group">
+                            <div className="h-48 overflow-hidden">
+                                {/* FIX: Replaced via.placeholder.com with ui-avatars.com */}
+                                <img 
+                                  src={article.imageUrl || 'https://ui-avatars.com/api/?name=News&background=random&size=800'} 
+                                  alt="" 
+                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500" 
+                                />
+                            </div>
+                            <div className="p-5">
+                                <div className="flex justify-between items-start mb-3">
+                                    <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">{article.category}</span>
+                                    <span className="text-xs text-gray-400">{new Date(article.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-2">{article.title}</h3>
+                                <p className="text-sm text-gray-500 line-clamp-3">{article.summary}</p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="col-span-2 bg-white p-8 rounded-xl text-center text-gray-500 border border-dashed">
+                        No news published yet.
                     </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-900 text-sm">{game.homeTeam?.name}</span>
-                      </div>
-                      <span className="text-xs font-bold text-gray-400">VS</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-900 text-sm">{game.awayTeam?.name}</span>
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-400 mt-2 truncate">{game.location}</div>
-                  </Link>
-                ))
-              ) : (
-                <div className="p-8 text-center text-gray-500 text-sm">No upcoming games scheduled.</div>
-              )}
-              <Link to="/schedule" className="block p-4 text-center text-orange-600 text-xs font-bold uppercase tracking-wider bg-gray-50 hover:bg-gray-100 transition">
-                Full League Schedule
-              </Link>
+                )}
             </div>
           </div>
 
-          {/* 2. STANDINGS */}
-          <div className="lg:col-span-1">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                <Trophy className="w-6 h-6 text-orange-500 mr-2"/> Standings
-              </h2>
-              <Link to="/standings" className="text-indigo-600 text-sm font-bold hover:underline">Full Table</Link>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <div className="col-span-2">Rank</div>
-                <div className="col-span-6">Team</div>
-                <div className="col-span-4 text-right">W-L</div>
-              </div>
-              {standings.length > 0 ? (
-                standings.map((team, index) => (
-                  <div key={team._id} className="grid grid-cols-12 gap-2 px-4 py-4 border-b border-gray-50 items-center hover:bg-indigo-50/30 transition">
-                    <div className="col-span-2 font-mono font-bold text-gray-400">#{index + 1}</div>
-                    <div className="col-span-6 flex items-center gap-2">
-                      <img 
-                        src={team.logoUrl || `https://ui-avatars.com/api/?name=${team.name}&background=random`} 
-                        alt="" 
-                        className="w-5 h-5 object-contain" 
-                        onError={(e) => e.target.src = `https://ui-avatars.com/api/?name=${team.name}&background=random`}
-                      />
-                      <span className="font-bold text-gray-900 truncate text-sm">{team.name}</span>
-                    </div>
-                    <div className="col-span-4 text-right font-mono text-sm font-medium">
-                      {team.wins}-{team.losses}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-8 text-center text-gray-500">No teams registered.</div>
-              )}
-            </div>
-          </div>
-
-          {/* 3. MVP RACE */}
-          <div className="lg:col-span-1">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                <Star className="w-6 h-6 text-yellow-500 mr-2 fill-current"/> MVP Race
-              </h2>
-              <Link to="/stats/leaders" className="text-indigo-600 text-sm font-bold hover:underline">Stats</Link>
-            </div>
+          {/* 2. SIDEBAR (Upcoming & Standings) */}
+          <div className="lg:col-span-1 space-y-8">
             
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              {mvpCandidates.length > 0 ? (
-                mvpCandidates.map((player, index) => (
-                  <div key={player._id} className="flex items-center justify-between p-4 border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer group">
-                    <div className="flex items-center gap-4">
-                      <span className="font-mono text-xl font-bold text-gray-300 w-4">#{index + 1}</span>
-                      <img 
-                        src={player.imageUrl} 
-                        onError={(e) => e.target.src = `https://ui-avatars.com/api/?name=${player.name}&background=random`}
-                        alt={player.name} 
-                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-100 group-hover:border-indigo-500 transition" 
-                      />
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-sm group-hover:text-indigo-600 transition">{player.name}</h4>
-                        <p className="text-xs text-gray-500">{typeof player.team === 'object' ? player.team?.name : player.team}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="block text-lg font-black text-gray-900">{player.ppg?.toFixed(1) || "0.0"}</span>
-                      <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">PPG</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-8 text-center text-gray-500">No player stats available yet.</div>
-              )}
+            {/* UPCOMING */}
+            <div>
+                <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                    <Calendar className="w-5 h-5 text-orange-600 mr-2"/> Upcoming
+                </h2>
+                <Link to="/schedule" className="text-indigo-600 text-xs font-bold hover:underline">Schedule</Link>
+                </div>
+                
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                {upcomingSchedule.length > 0 ? (
+                    upcomingSchedule.map((game) => (
+                    <Link to={`/game/${game._id}`} key={game._id} className="block p-4 border-b border-gray-50 hover:bg-gray-50 transition">
+                        <div className="text-xs text-gray-400 mb-2 flex items-center">
+                        <Clock className="w-3 h-3 mr-1"/> {new Date(game.date).toLocaleDateString()}
+                        </div>
+                        <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900 text-sm">{game.homeTeam?.name}</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-400">VS</span>
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900 text-sm">{game.awayTeam?.name}</span>
+                        </div>
+                        </div>
+                    </Link>
+                    ))
+                ) : (
+                    <div className="p-6 text-center text-gray-500 text-sm">No upcoming games.</div>
+                )}
+                </div>
             </div>
+
+            {/* STANDINGS */}
+            <div>
+                <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                    <Trophy className="w-5 h-5 text-yellow-500 mr-2"/> Standings
+                </h2>
+                <Link to="/standings" className="text-indigo-600 text-xs font-bold hover:underline">Full Table</Link>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    <div className="col-span-2">Rank</div>
+                    <div className="col-span-7">Team</div>
+                    <div className="col-span-3 text-right">Rec</div>
+                </div>
+                {standings.length > 0 ? (
+                    standings.map((team, index) => (
+                    <div key={team._id} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-gray-50 items-center hover:bg-indigo-50/30 transition">
+                        <div className="col-span-2 font-mono font-bold text-gray-400 text-xs">#{index + 1}</div>
+                        <div className="col-span-7 flex items-center gap-2">
+                        <span className="font-bold text-gray-900 truncate text-xs">{team.name}</span>
+                        </div>
+                        <div className="col-span-3 text-right font-mono text-xs font-medium">
+                        {team.wins}-{team.losses}
+                        </div>
+                    </div>
+                    ))
+                ) : (
+                    <div className="p-6 text-center text-gray-500 text-sm">No teams registered.</div>
+                )}
+                </div>
+            </div>
+
           </div>
 
         </div>

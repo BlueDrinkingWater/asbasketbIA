@@ -1,4 +1,3 @@
-// client/src/pages/AdminDashboard.jsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -11,13 +10,19 @@ import {
   createPlayer,
   createGame,
   fetchTeams,
-  fetchGames 
+  fetchGames,
+  fetchNews,
+  createNews,
+  updateNews,
+  deleteNews,
+  fetchSettings,
+  updateSettings
 } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
   Check, X, User, Users, Activity, Calendar, 
   Loader, Plus, Settings, Shield, Upload, Trophy, Trash2,
-  Monitor, AlertCircle, Ticket, Newspaper
+  Monitor, AlertCircle, Ticket, Newspaper, Edit, Video
 } from 'lucide-react';
 import GameTicker from '../components/GameTicker';
 
@@ -42,6 +47,13 @@ const AdminDashboard = () => {
     ppg: 0, rpg: 0, apg: 0, image: null 
   });
 
+  // --- CONTENT MANAGEMENT STATE ---
+  const [newsList, setNewsList] = useState([]);
+  // FIX: Initial state ensures no undefined inputs
+  const [newsForm, setNewsForm] = useState({ id: null, title: '', summary: '', content: '', category: 'Announcement', imageUrl: '' });
+  const [isEditingNews, setIsEditingNews] = useState(false);
+  const [leagueSettings, setLeagueSettings] = useState({ liveStreamUrl: '' });
+
   // --- Data Loading ---
   const loadData = async () => {
     try {
@@ -64,9 +76,23 @@ const AdminDashboard = () => {
     }
   };
 
+  const loadContentData = async () => {
+    try {
+        const [newsRes, settingsRes] = await Promise.all([fetchNews(), fetchSettings()]);
+        if(newsRes.data.success) setNewsList(newsRes.data.data);
+        if(settingsRes.data.success) setLeagueSettings(settingsRes.data.data);
+    } catch (error) {
+        toast.error("Failed to load content data");
+    }
+  }
+
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if(activeTab === 'content') loadContentData();
+  }, [activeTab]);
 
   // --- Handlers ---
   const handleSubAction = async (userId, status) => {
@@ -104,6 +130,64 @@ const AdminDashboard = () => {
     try { await createPlayer(formData); toast.success('Player added successfully!'); setPlayerForm({ name: '', team: '', position: 'PG', jerseyNumber: '', ppg: 0, rpg: 0, apg: 0, image: null }); } catch (err) { toast.error(err.response?.data?.message || 'Failed to add player'); }
   };
 
+  // --- Content Handlers ---
+  const handleSaveNews = async (e) => {
+    e.preventDefault();
+    if(!newsForm.title || !newsForm.content) return toast.error("Title and Content are required");
+    
+    try {
+        if(isEditingNews && newsForm.id) {
+            await updateNews(newsForm.id, newsForm);
+            toast.success("News updated!");
+        } else {
+            await createNews(newsForm);
+            toast.success("News published!");
+        }
+        // Reset form safely
+        setNewsForm({ id: null, title: '', summary: '', content: '', category: 'Announcement', imageUrl: '' });
+        setIsEditingNews(false);
+        loadContentData();
+    } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to save news");
+    }
+  };
+
+  const handleEditNews = (article) => {
+    // FIX: Ensure fallback to empty strings to prevent "uncontrolled input" warning
+    setNewsForm({ 
+      ...article, 
+      id: article._id,
+      title: article.title || '',
+      summary: article.summary || '',
+      content: article.content || '',
+      category: article.category || 'Announcement',
+      imageUrl: article.imageUrl || ''
+    });
+    setIsEditingNews(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteNews = async (id) => {
+    if(!window.confirm("Are you sure you want to delete this article?")) return;
+    try {
+        await deleteNews(id);
+        toast.success("Article deleted");
+        loadContentData();
+    } catch (err) {
+        toast.error("Failed to delete");
+    }
+  };
+
+  const handleSaveSettings = async (e) => {
+      e.preventDefault();
+      try {
+          await updateSettings(leagueSettings);
+          toast.success("Home page settings updated");
+      } catch (err) {
+          toast.error("Failed to update settings");
+      }
+  };
+
   // Tournament Logic
   const addMatchupRow = () => setMatchups([...matchups, { id: Date.now(), home: '', away: '' }]);
   const removeMatchupRow = (id) => { if (matchups.length > 1) setMatchups(matchups.filter(m => m.id !== id)); };
@@ -136,15 +220,14 @@ const AdminDashboard = () => {
     </div>
   );
 
-  // Updated Tabs Configuration
   const tabs = [
     { id: 'users', label: 'Approvals', icon: User, count: (data?.pendingUsers?.length || 0) + (data?.teamRequests?.length || 0) },
     { id: 'stats', label: 'Stats/Games', icon: Activity, count: (data?.statRequests?.length || 0) + (data?.gameRequests?.length || 0) },
     { id: 'manage', label: 'League Data', icon: Settings },
     { id: 'tournament', label: 'Tournament', icon: Trophy },
     { id: 'live', label: 'Live Ops', icon: Monitor },
-    { id: 'content', label: 'News & Media', icon: Newspaper }, // NEW
-    { id: 'tickets', label: 'Ticketing', icon: Ticket },       // NEW
+    { id: 'content', label: 'News & Media', icon: Newspaper }, 
+    { id: 'tickets', label: 'Ticketing', icon: Ticket },       
   ];
 
   return (
@@ -157,7 +240,6 @@ const AdminDashboard = () => {
                 <Shield className="w-6 h-6 mr-2 text-orange-600" />
                 ADMIN <span className="text-orange-600 ml-1">PORTAL</span>
             </h1>
-            {/* NEW: Direct Link to League Settings */}
             <Link to="/admin/settings" className="text-xs font-bold text-gray-500 hover:text-orange-600 flex items-center bg-gray-100 px-3 py-1.5 rounded-full transition-colors">
                 <Settings className="w-3 h-3 mr-1" /> League Settings
             </Link>
@@ -545,15 +627,138 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* 6. NEW: NEWS & CONTENT (Placeholder for missing module) */}
+          {/* 6. NEW: NEWS & CONTENT */}
           {activeTab === 'content' && (
-            <div className="p-8 flex flex-col items-center justify-center h-full text-center">
-                <Newspaper className="w-16 h-16 text-gray-300 mb-4" />
-                <h3 className="text-xl font-bold text-gray-900">News & Content Management</h3>
-                <p className="text-gray-500 mb-6 max-w-md">Manage league announcements, press releases, and media content appearing on the public news page.</p>
-                <Link to="/news" className="px-6 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition">
-                    View Live News Page
-                </Link>
+            <div className="flex flex-col h-full bg-gray-50">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-8">
+                    {/* Left Column: Forms */}
+                    <div className="lg:col-span-1 space-y-8">
+                        {/* Live Stream Link Management */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                                <Video className="w-5 h-5 mr-2 text-red-500" /> Live Stream Config
+                            </h3>
+                            <p className="text-xs text-gray-500 mb-4">Embed a YouTube or Twitch link to display on the Home Page hero section.</p>
+                            <form onSubmit={handleSaveSettings}>
+                                <div className="mb-4">
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Stream URL</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="https://youtube.com/watch?v=..." 
+                                        className="w-full border-gray-300 rounded-lg p-2 text-sm focus:ring-orange-500"
+                                        value={leagueSettings.liveStreamUrl || ''}
+                                        onChange={(e) => setLeagueSettings({...leagueSettings, liveStreamUrl: e.target.value})}
+                                    />
+                                </div>
+                                <button type="submit" className="w-full py-2 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-gray-800 transition">
+                                    Update Live Link
+                                </button>
+                            </form>
+                        </div>
+
+                        {/* News Editor Form */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                                {isEditingNews ? <><Edit className="w-5 h-5 mr-2 text-indigo-500"/> Edit Article</> : <><Plus className="w-5 h-5 mr-2 text-green-500"/> Post News</>}
+                            </h3>
+                            <form onSubmit={handleSaveNews} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Title <span className="text-red-500">*</span></label>
+                                    <input type="text" required className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                        value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Category</label>
+                                    <select className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                        value={newsForm.category} onChange={e => setNewsForm({...newsForm, category: e.target.value})}
+                                    >
+                                        {['Recap', 'Announcement', 'Trade', 'Interview', 'Highlight'].map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Image URL</label>
+                                    <input type="text" placeholder="https://..." className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                        value={newsForm.imageUrl} onChange={e => setNewsForm({...newsForm, imageUrl: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Summary</label>
+                                    <input type="text" maxLength="150" placeholder="Short description..." className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                        value={newsForm.summary} onChange={e => setNewsForm({...newsForm, summary: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Content <span className="text-red-500">*</span></label>
+                                    <textarea required rows="6" className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                        value={newsForm.content} onChange={e => setNewsForm({...newsForm, content: e.target.value})}
+                                    ></textarea>
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button type="submit" className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition">
+                                        {isEditingNews ? 'Update Article' : 'Publish Article'}
+                                    </button>
+                                    {isEditingNews && (
+                                        <button type="button" onClick={() => { setIsEditingNews(false); setNewsForm({id: null, title: '', summary: '', content: '', category: 'Announcement', imageUrl: ''}); }} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-300">
+                                            Cancel
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Right Column: List */}
+                    <div className="lg:col-span-2">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                                <h3 className="font-bold text-gray-800">Recent Posts</h3>
+                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">{newsList.length} items</span>
+                            </div>
+                            <div className="divide-y divide-gray-100">
+                                {newsList.length === 0 ? (
+                                    <div className="p-8 text-center text-gray-500">No news articles found.</div>
+                                ) : (
+                                    newsList.map(article => (
+                                        <div key={article._id} className="p-4 hover:bg-gray-50 transition flex gap-4">
+                                            <img 
+                                                // FIX: Changed placeholder to ui-avatars to prevent ERR_NAME_NOT_RESOLVED
+                                                src={article.imageUrl || 'https://ui-avatars.com/api/?name=News&background=random'} 
+                                                alt="" 
+                                                className="w-24 h-16 object-cover rounded-lg bg-gray-200"
+                                            />
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                                            article.category === 'Announcement' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                                                            article.category === 'Recap' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-gray-100 text-gray-600 border-gray-200'
+                                                        }`}>{article.category}</span>
+                                                        <h4 className="font-bold text-gray-900 mt-1 line-clamp-1">{article.title}</h4>
+                                                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{article.summary}</p>
+                                                    </div>
+                                                    <div className="flex space-x-2 ml-4">
+                                                        <button onClick={() => handleEditNews(article)} className="p-1.5 text-gray-400 hover:text-indigo-600 bg-white border border-gray-200 rounded hover:border-indigo-200 transition">
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteNews(article._id)} className="p-1.5 text-gray-400 hover:text-red-600 bg-white border border-gray-200 rounded hover:border-red-200 transition">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="text-[10px] text-gray-400 mt-2 flex items-center">
+                                                    <span>By {article.author}</span>
+                                                    <span className="mx-1">•</span>
+                                                    <span>{new Date(article.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
           )}
 

@@ -1,3 +1,4 @@
+// client/src/services/api.js
 import axios from 'axios';
 
 const API = axios.create({ baseURL: 'http://localhost:5000/api' });
@@ -24,17 +25,23 @@ export const updateTeamRequest = (data) => API.put('/auth/admin/team-request', d
 export const updateStatRequest = (data) => API.put('/auth/admin/stat-request', data);
 export const updateGameRequest = (data) => API.put('/auth/admin/game-request', data);
 
-// --- Public Data & Management ---
+// --- League Settings ---
+export const fetchSettings = () => API.get('/admin/settings');
+export const updateSettings = (data) => API.put('/admin/settings', data);
 
-// Teams
+// --- News & Content ---
+export const fetchNews = () => API.get('/news');
+export const createNews = (data) => API.post('/news', data);
+export const updateNews = (id, data) => API.put(`/news/${id}`, data);
+export const deleteNews = (id) => API.delete(`/news/${id}`);
+
+// --- Public Data & Management ---
 export const fetchTeams = () => API.get('/teams');
-// FIX: Changed endpoint to avoid duplication with fetchTeams
 export const fetchStandings = () => API.get('/standings'); 
 export const createTeam = (data) => API.post('/teams', data);
 
 // Players
 export const fetchPlayers = (params) => API.get('/players', { params });
-// Supports file upload (multipart/form-data)
 export const createPlayer = (data) => API.post('/players', data, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });

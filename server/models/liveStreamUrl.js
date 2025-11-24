@@ -1,3 +1,4 @@
+// server/models/LeagueSettings.js
 import mongoose from 'mongoose';
 
 const leagueSettingsSchema = new mongoose.Schema({
@@ -9,12 +10,10 @@ const leagueSettingsSchema = new mongoose.Schema({
   isMaintenanceMode: { type: Boolean, default: false },
   allowNewRegistrations: { type: Boolean, default: true },
   
-  // League Info
+  // League Info & Home Page Content
   commissionerMessage: { type: String, default: 'Welcome to the league!' },
   rulesUrl: { type: String },
-  
-  // --- ADD THIS LINE BELOW ---
-  liveStreamUrl: { type: String, default: '' } 
+  liveStreamUrl: { type: String, default: '' } // NEW: Link for live game on home page
   
 }, { timestamps: true });
 

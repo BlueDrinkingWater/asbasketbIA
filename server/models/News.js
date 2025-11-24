@@ -22,7 +22,8 @@ const newsSchema = new mongoose.Schema({
   },
   imageUrl: { 
     type: String, 
-    default: 'https://via.placeholder.com/800x400?text=League+News' 
+    // FIX: Changed to ui-avatars.com
+    default: 'https://ui-avatars.com/api/?name=News&background=random&size=800' 
   },
   author: { type: String, default: 'League Official' },
   isPublished: { type: Boolean, default: true }
